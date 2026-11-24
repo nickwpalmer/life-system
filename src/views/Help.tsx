@@ -11,7 +11,7 @@ const QA: [string, string][] = [
   ['What’s the difference between a goal and a project?', 'A goal is an outcome you want, like “Finish the semester with a 3.5”. A project is a set of tasks with a finish line that moves you toward it, like “Study plan for MATH 101 final”. Link tasks to a goal and its progress fills in as you finish them.'],
   ['When does Home switch between morning, day and night?', 'By default morning runs 4:30 to 9 AM, the quick log 9 AM to 8 PM, and night 8 PM to 4:30 AM. Change the times in Settings.'],
   ['Where does my data live?', 'In your own private database. Only you can read it when signed in, and Claude reads it with your permission to keep things up to date. The app’s code is public, but none of your data is in it.'],
-  ['How does Apple Health get in?', 'A Shortcut on your iPhone sends last night’s sleep and yesterday’s activity each morning. Settings has the steps to set it up.'],
+  ['How does Apple Health get in?', 'A Shortcut on your iPhone sends last night’s sleep and yesterday’s steps each morning. Settings has the steps to set it up..'],
 ]
 
 export function Help() {

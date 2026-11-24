@@ -24,18 +24,20 @@ function Steps({ fresh }: { fresh: string | null }) {
   const url = `${SUPABASE_URL}/rest/v1/rpc/ingest_health`
   return (
     <>
-      <p class="muted small" style="margin-bottom:12px">Your Ultrahuman ring already writes to Apple Health. This Shortcut sends the day’s numbers here every evening, so the Body section of your daily log fills itself.</p>
+      <p class="muted small" style="margin-bottom:12px">Your Ultrahuman ring writes to Apple Health. This Shortcut runs each morning and sends last night’s sleep, HRV and resting heart rate, plus yesterday’s full step count, so the Body part of your log is filled before you open the app.</p>
       {fresh ? <Copyable label="Your key (shown once)" value={fresh} /> : <p class="small" style="margin-bottom:10px">Your key was shown when you made it. Lost it? Make a new one below; the old one stops working.</p>}
       <Copyable label="URL" value={url} />
       <Copyable label="apikey header" value={SUPABASE_KEY} />
       <ol class="steps small">
         <li>Open <b>Shortcuts</b>, tap <b>+</b>, name it <b>Send health to Life</b>.</li>
-        <li><b>Find Health Samples</b>: Type <b>Steps</b>, Start Date <b>is today</b>. Add <b>Calculate Statistics</b> (Sum), then <b>Set Variable</b> <code>steps</code>.</li>
-        <li>Same for <b>Heart Rate Variability</b> (Start Date in the last 1 day, Average) into <code>hrv</code>, and <b>Resting Heart Rate</b> (Average) into <code>rhr</code>.</li>
-        <li><b>Find Health Samples</b>: Type <b>Sleep Analysis</b>, Start Date in the last 1 day, Value is any of the asleep stages. Add <b>Get Details of Health Sample</b> (Duration), <b>Calculate Statistics</b> (Sum), <b>Set Variable</b> <code>sleep</code>. Minutes are fine.</li>
-        <li><b>Get Contents of URL</b> with the URL above. Method <b>POST</b>. Headers: <code>apikey</code> = the apikey above, <code>Content-Type</code> = <code>application/json</code>. Request Body <b>JSON</b>: <code>p_key</code> = your key, and <code>p_values</code> as a Dictionary with <code>steps</code>, <code>hrv</code>, <code>resting_hr</code>, <code>sleep_hours</code> set to those variables.</li>
-        <li>Run it once. It should answer with <code>"ok": true</code>.</li>
-        <li>In <b>Automation</b>, add <b>Time of Day</b>, 9:00 PM daily, <b>Run Immediately</b>, and pick this shortcut.</li>
+        <li><b>Find Health Samples</b>: Type <b>Sleep Analysis</b>, Start Date in the last <b>1 day</b>, Value is any of the asleep stages. Add <b>Get Details of Health Sample</b> (Duration), <b>Calculate Statistics</b> (Sum), <b>Set Variable</b> <code>sleep</code>. Minutes are fine.</li>
+        <li>Same for <b>Heart Rate Variability</b> (last 1 day, Average) into <code>hrv</code>, and <b>Resting Heart Rate</b> (Average) into <code>rhr</code>.</li>
+        <li><b>Get Contents of URL</b> with the URL above. Method <b>POST</b>. Headers: <code>apikey</code> = the apikey above, <code>Content-Type</code> = <code>application/json</code>. Request Body <b>JSON</b>: <code>p_key</code> = your key, and <code>p_values</code> as a Dictionary with <code>sleep_hours</code>, <code>hrv</code>, <code>resting_hr</code>.</li>
+        <li>For yesterday’s steps: <b>Adjust Date</b> on Current Date, <b>Get Start of Day</b>, into <code>today0</code>. <b>Adjust Date</b> again, subtract <b>1 day</b> from <code>today0</code>, into <code>yday0</code>.</li>
+        <li><b>Find Health Samples</b>: Type <b>Steps</b>, Start Date <b>is between</b> <code>yday0</code> and <code>today0</code>. <b>Calculate Statistics</b> (Sum) into <code>steps</code>.</li>
+        <li><b>Format Date</b> <code>yday0</code> with custom format <code>yyyy-MM-dd</code>. Then a second <b>Get Contents of URL</b> like step 4, with <code>p_day</code> = that date and <code>p_values</code> holding just <code>steps</code>.</li>
+        <li>Run it once. Both calls should answer with <code>"ok": true</code>.</li>
+        <li>In <b>Automation</b>, tap <b>+</b>, choose <b>Time of Day</b>, <b>7:30 AM</b> daily (or <b>Alarm, is stopped</b> if you’d rather it follow your alarm), set <b>Run Immediately</b>, and pick this shortcut.</li>
       </ol>
       <p class="faint tiny">Running it again the same day just replaces that day’s numbers. The key can only add health numbers; it can’t read anything.</p>
     </>
@@ -66,7 +68,7 @@ export function HealthSync() {
     <section class="card" style="--accent:var(--mint)">
       <div class="card-h"><div class="row"><span class="h-ico"><Icon name="heart" size={15} /></span><h2>Apple Health</h2></div>
         {row && <span class="faint small">{row.last_used_at ? `Synced ${fmtShort(row.last_used_at.slice(0, 10))}` : 'Waiting for first sync'}</span>}</div>
-      <p class="muted small" style="margin-bottom:12px">Sleep, HRV, resting heart rate and steps from your ring, sent nightly by an iPhone Shortcut. About five minutes to set up.</p>
+      <p class="muted small" style="margin-bottom:12px">Sleep, HRV, resting heart rate and steps from your ring, sent every morning by an iPhone Shortcut. About ten minutes to set up.</p>
       <div class="row wrap">
         {row === null && <button class="btn primary sm" disabled={busy} onClick={make}>Set it up</button>}
         {row && <button class="btn sm" onClick={() => setOpen(true)}>Setup steps</button>}
