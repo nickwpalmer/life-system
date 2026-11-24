@@ -289,6 +289,17 @@ textarea.input.tall { min-height: 260px; }
 .entry .e-title { font-weight: 620; }
 .entry .e-body { color: var(--muted); font-size: 14.5px; line-height: 1.45; margin-top: 4px; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; white-space: pre-wrap; overflow-wrap: anywhere; }
 .entry .e-meta { font-size: 12.5px; color: var(--faint); margin-top: 6px; }
+.entry.by-me, .entry.by-claude { padding-left: 14px; border-left: 3px solid var(--mint); border-bottom-color: var(--line); margin: 2px 0; border-radius: 4px; }
+.entry.by-claude { border-left-color: var(--lilac); background: color-mix(in oklab, var(--lilac) 9%, transparent); border-bottom-color: transparent; }
+.entry.by-claude .e-title { color: var(--lilac); }
+.e-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11.5px; font-weight: 600; letter-spacing: .02em; color: var(--lilac); background: color-mix(in oklab, var(--lilac) 16%, transparent); padding: 2px 8px; border-radius: 99px; margin-bottom: 6px; }
+.by-claude-note { color: var(--lilac); margin: 2px 2px 8px; }
+.photos { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.photos .ph { position: relative; width: 92px; height: 92px; border-radius: 12px; overflow: hidden; background: var(--line); }
+.photos.small .ph { width: 56px; height: 56px; border-radius: 9px; }
+.photos img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.photos .ph-wait { display: block; width: 100%; height: 100%; animation: pulse 1.4s ease-in-out infinite; background: color-mix(in oklab, var(--mint) 14%, transparent); }
+.photos .ph-x { position: absolute; top: 4px; right: 4px; width: 22px; height: 22px; border-radius: 99px; display: grid; place-items: center; background: rgba(0,0,0,.55); color: #fff; }
 .notes-grid { columns: 2 170px; column-gap: 10px; }
 .note { break-inside: avoid; margin-bottom: 10px; background: var(--surface); border: 1px solid var(--line); border-top: 2px solid var(--c, var(--line)); border-radius: 16px; padding: 14px; cursor: pointer; transition: transform 0.2s var(--spring); }
 .note:active { transform: scale(0.97); }

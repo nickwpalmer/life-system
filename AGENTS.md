@@ -22,7 +22,7 @@ Read this before you add, change or delete anything in the database, whatever to
 | What the owner says | Table | How |
 |---|---|---|
 | Something to do | `tasks` | `status='inbox'` if it needs sorting, `'open'` if clear. `source='claude'`. |
-| A feeling, reflection, story | `journal_entries` | `body`, optional `title`, `mood` 1 to 10, `occurred_at` = when it happened. |
+| A feeling, reflection, story | `journal_entries` | `body`, optional `title`, `mood` 1 to 10, `occurred_at` = when it happened. See Journal. |
 | A number for the day (slept 7h, mood 6) | `logs` | Daily entry; see Logs. |
 | Something taken (coffee, a drink, a supplement) | `substance_logs` | `substance`, `amount`, `unit`, `occurred_at`; `time_known=false` if no time given (use local noon). |
 | A document or ID-type fact (insurance, registration, W-2) | `records` | See Records. |
@@ -50,6 +50,12 @@ Areas (`areas.key`): `education`, `mental`, `finances`, `health`, `work`, `relat
 - **Timed value** (a mood right now, a workout at 6 PM): `source='app'` or `'claude'`, `occurred_at` = the actual time.
 - Apple Health writes `source='health'` through RPC `ingest_health`. Don't write those by hand.
 - `value_num` for numbers, `value_text` for text metrics, `note` for context.
+
+## Journal
+
+- `author`: `'nick'` for the owner's own writing (the default), `'claude'` for anything an AI wrote, such as a summary of a brain dump. **Always set `author='claude'` when you write a journal entry.** The app shows the two in different colors.
+- Never write an entry as if the owner wrote it. A summary of what they said is `author='claude'`, titled like "Claude's summary: Tuesday brain dump".
+- `photos`: storage paths of attached pictures, in the private bucket `journal-photos`, at `<owner_id>/<uuid>.jpg`. The app shrinks pictures before upload (longest side 1600px, JPEG); the bucket refuses files over 1 MB. Don't upload photos yourself unless the owner sends one and asks; never make the bucket public.
 
 ## Records
 

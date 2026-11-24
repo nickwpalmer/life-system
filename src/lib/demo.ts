@@ -71,7 +71,8 @@ export function demoData(): Data {
   return {
     profile: { id: 'demo', display_name: 'Jordan', timezone: 'America/Detroit', settings: {} },
     areas, metrics, tasks, logs, checkins, events,
-    journal: [{ id: id(), area_id: null, title: 'Sunday reset', body: 'Felt scattered this week. Too many small things in my head. Writing them all down helped.', mood: 6, tags: [], occurred_at: addDays(new Date(), -2).toISOString() }],
+    journal: [{ id: id(), area_id: null, title: 'Sunday reset', body: 'Felt scattered this week. Too many small things in my head. Writing them all down helped.', mood: 6, tags: [], occurred_at: addDays(new Date(), -2).toISOString(), author: 'nick', photos: [] },
+      { id: id(), area_id: null, title: 'Claude’s summary: Monday brain dump', body: 'Work is busy this week. The physics exam is on your mind, and you want to start the scholarship essays early. Filed 4 tasks and 1 record.', mood: null, tags: [], occurred_at: addDays(new Date(), -1).toISOString(), author: 'claude', photos: [] }],
     notes: [{ id: id(), area_id: A('education'), title: 'Class schedule', body: 'Mon/Wed/Fri 9:00 SEM 100\nTue/Thu 1:00 MATH 101', pinned: true, tags: [], updated_at: new Date().toISOString() },
       { id: id(), area_id: A('health'), title: 'Gym routine', body: 'Push / pull / legs, 45 min', pinned: false, tags: [], updated_at: new Date().toISOString() }],
     goals: [

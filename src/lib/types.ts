@@ -37,6 +37,10 @@ export type Checkin = {
 export type JournalEntry = {
   id: string; area_id: string | null; title: string | null; body: string; mood: number | null
   tags: string[]; occurred_at: string
+  /** Who wrote it: you, or Claude (summaries from brain dumps). */
+  author?: 'nick' | 'claude'
+  /** Storage paths of attached photos (private bucket journal-photos). */
+  photos?: string[]
 }
 
 export type Note = {
