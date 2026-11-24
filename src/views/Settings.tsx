@@ -7,6 +7,7 @@ import { ROLE_LABEL } from '../lib/metrics'
 import type { Area, Metric, MetricKind, MetricRole } from '../lib/types'
 import { Icon } from '../ui/icons'
 import { Sheet, Switch, PageHead } from '../ui/kit'
+import { HealthSync } from './HealthSync'
 
 type Passkey = { id: string; friendly_name?: string; created_at: string; last_used_at?: string }
 
@@ -130,6 +131,7 @@ export function Settings() {
       </section>
 
       <Security />
+      <HealthSync />
 
       <section class="card">
         <div class="card-h"><h2>On your Mac</h2></div>
