@@ -592,10 +592,10 @@ button.tile { text-align: left; font: inherit; cursor: pointer; }
 .conn { display: flex; align-items: center; gap: 12px; padding: 10px 2px; border-bottom: 1px solid var(--line); color: var(--text); text-decoration: none; }
 .conn:last-child { border-bottom: 0; }
 .conn .m-ico { width: 34px; height: 34px; border-radius: 10px; display: grid; place-items: center; flex: none; background: var(--surface-2); color: var(--lilac); }
-.stat { width: 10px; height: 10px; border-radius: 50%; flex: none; }
-.stat.ok { background: var(--mint); box-shadow: 0 0 10px var(--mint); }
-.stat.warn { background: var(--gold); box-shadow: 0 0 10px var(--gold); }
-.stat.off { background: var(--surface-3); }
+.cstat { width: 10px; height: 10px; border-radius: 50%; flex: none; }
+.cstat.ok { background: var(--mint); box-shadow: 0 0 10px var(--mint); }
+.cstat.warn { background: var(--gold); box-shadow: 0 0 10px var(--gold); }
+.cstat.off { background: var(--surface-3); }
 .chg { display: flex; align-items: center; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--line); }
 .chg.undone { opacity: 0.45; }
 .faq { border-bottom: 1px solid var(--line); }

@@ -10,7 +10,7 @@ type KeyDate = { id: string; day: string; title: string; course: string | null; 
 type Due = { key: string; day: string; title: string; course: string | null; kind: KeyDate['kind']; from: 'canvas' | 'key'; id?: string; done?: boolean }
 
 const demoDates = (): KeyDate[] => [
-  { id: 'k1', day: inDays(3), title: 'Lab report', course: 'BE 1200', kind: 'deadline', done: false },
+  { id: 'k1', day: inDays(3), title: 'Lab report', course: 'ENGR 110', kind: 'deadline', done: false },
   { id: 'k2', day: inDays(9), title: 'Test 3', course: 'MATH 101', kind: 'exam', done: false },
   { id: 'k3', day: inDays(20), title: 'Last day of classes', course: null, kind: 'term', done: false },
 ]

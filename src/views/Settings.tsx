@@ -182,7 +182,7 @@ function Connections() {
     <section class="card">
       <div class="card-h"><h2>Connections</h2></div>
       {rows.map(([n, ic, sub, s, href]) => {
-        const inner = <><span class="m-ico"><Icon name={ic} size={18} /></span><span class="grow"><div>{n}</div><div class="faint tiny">{sub}</div></span><i class={`stat ${s}`} aria-label={s === 'ok' ? 'Working' : s === 'warn' ? 'Behind' : 'Not set up'} /></>
+        const inner = <><span class="m-ico"><Icon name={ic} size={18} /></span><span class="grow"><div>{n}</div><div class="faint tiny">{sub}</div></span><i class={`cstat ${s}`} aria-label={s === 'ok' ? 'Working' : s === 'warn' ? 'Behind' : 'Not set up'} /></>
         return href ? <a class="conn" href={href} target={href.startsWith('http') ? '_blank' : undefined} rel="noopener">{inner}</a> : <div class="conn">{inner}</div>
       })}
     </section>
