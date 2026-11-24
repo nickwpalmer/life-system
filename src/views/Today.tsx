@@ -140,7 +140,7 @@ function NextSteps() {
   if (!goals.length) return ideas ? (
     <a class="card soft prompt" href="#/goals" style="--accent:var(--gold)">
       <span class="orb"><Icon name="target" size={22} /></span>
-      <span class="grow"><h3>{ideas} goal idea{ideas === 1 ? '' : 's'} for you</h3><p class="muted small">Keep the ones that fit, drop the rest. Each comes with a first step.</p></span>
+      <span class="grow"><h3>{ideas} proposed goal{ideas === 1 ? "" : "s"} to look at</h3><p class="muted small">Keep the ones that fit, drop the rest. Each comes with a first step.</p></span>
       <Icon name="chev" />
     </a>
   ) : null

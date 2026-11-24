@@ -94,11 +94,11 @@ export function Goals() {
       <PageHead title="Goals" sub="A few that matter, each with a next step." icon="target" color="var(--gold)" action={<button class="icon-btn" aria-label="New goal" onClick={() => setEdit('new')}><Icon name="plus" /></button>} />
       <CompassCard />
       {suggested.length > 0 && (
-        <Card title="Ideas from what you’ve told me" icon="sparkle" accent="var(--lilac)" class="soft">
-          <p class="muted small" style="margin-bottom:6px">My guesses, not yours yet. Keep the ones that fit and reword them however you like.</p>
+        <Card title="Proposed goals" icon="sparkle" accent="var(--lilac)" class="soft">
+          <p class="muted small" style="margin-bottom:6px">My guesses from what you’ve told me. None of these count as your goals until you tap Keep.</p>
           {suggested.map((g) => (
             <div class="goal">
-              <div class="g-title">{g.title}</div>
+              <div class="g-title">{g.title} <span class="chip small" style="--c:var(--lilac)">Proposed</span></div>
               {g.why && <div class="g-why">{g.why}</div>}
               <div class="row" style="margin-top:10px">
                 <button class="btn sm primary" onClick={(e) => { burst(e.currentTarget); update('goals', g.id, { suggested: false }); toast('Added to your goals') }}>Keep</button>

@@ -7,6 +7,7 @@ import { PageHead, Card, Ring } from '../ui/kit'
 import { LineChart, BarChart } from '../ui/charts'
 import { TaskRow, TaskSheet, AddTask, openTask } from './Tasks'
 import { goalProgress } from './Goals'
+import { MoneyPanel } from './Money'
 
 const avg = (xs: (number | null)[]) => { const v = xs.filter((x): x is number => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null }
 const sum = (xs: (number | null)[]) => xs.reduce<number>((a, b) => a + (b ?? 0), 0)
@@ -43,19 +44,15 @@ function Finances() {
   const metrics = useStore((s) => s.metrics)
   const logs = useStore((s) => s.logs)
   const spend = metrics.find((m) => m.key === 'spend')
-  if (!spend) return null
+  if (!spend) return <MoneyPanel />
   const days = lastNDays(30)
   const s = dailySeries(spend, logs, days)
-  const week = sum(s.slice(-7)), month = sum(s)
+  const week = sum(s.slice(-7))
   return <>
-    <div class="stat-row">
-      <div class="stat" style="--c:var(--gold)"><div class="s-val">${Math.round(week)}</div><div class="s-lbl">spent, 7 days</div></div>
-      <div class="stat" style="--c:var(--orange)"><div class="s-val">${Math.round(month)}</div><div class="s-lbl">spent, 30 days</div></div>
-      <div class="stat" style="--c:var(--mint)"><div class="s-val">{s.filter((v) => v === 0).length}</div><div class="s-lbl">no-spend days</div></div>
-    </div>
-    <Card title="Daily spending" icon="wallet" accent="var(--gold)">
+    <MoneyPanel />
+    <Card title="Spending you logged" icon="wallet" accent="var(--gold)" action={<span class="faint small">${Math.round(week)} this week · {s.filter((v) => v === 0).length} no-spend days</span>}>
       <BarChart days={days} values={s} color="#ffd66b" />
-      <p class="faint small" style="margin-top:8px">Log what you spent each night in the daily log. Logging $0 counts too, and it’s worth celebrating.</p>
+      <p class="faint small" style="margin-top:8px">Optional now that Monarch shows your cards. Logging $0 days still counts, and it’s worth celebrating.</p>
     </Card>
   </>
 }
