@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'preact/hooks'
 import { useStore, areaByKey } from '../lib/store'
-import { lastNDays, fmtDay, daysUntil, dayKey } from '../lib/dates'
+import { lastNDays, fmtDay, dayKey } from '../lib/dates'
 import { dailySeries, fmtValue, consistency } from '../lib/metrics'
 import type { Task, Metric } from '../lib/types'
 import { PageHead, Card, Ring, Sheet } from '../ui/kit'
@@ -31,13 +31,11 @@ function Education({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Task) => void
   // Courses come from the tag each task carries (TickTick lists came over as tags).
   const courses = new Map<string, Task[]>()
   for (const t of tasks) for (const tag of t.tags ?? []) if (/^[A-Z]{2,4}-?\d{3,4}/.test(tag)) courses.set(tag, [...(courses.get(tag) ?? []), t])
-  const deadlines = tasks.filter((t) => t.due_date && daysUntil(t.due_date) >= -3).sort((a, b) => a.due_date!.localeCompare(b.due_date!)).slice(0, 8)
   return <>
     {courses.size > 0 && <div class="tiles">{[...courses].map(([c, ts]) => {
       const next = ts.filter((t) => t.due_date).sort((a, b) => a.due_date!.localeCompare(b.due_date!))[0]
       return <div class="tile" style="--c:var(--lilac)"><div class="t-name">{c}</div><div class="t-sub">{ts.length} open{next ? ` · next ${fmtDay(next.due_date!).toLowerCase()}` : ''}</div></div>
     })}</div>}
-    <Card title="Task deadlines" icon="tasks" accent="var(--lilac)">{deadlines.length ? deadlines.map((t) => <TaskRow t={t} onOpen={onOpen} />) : <p class="empty" style="padding:8px">No dated assignments. Add due dates and they show up here.</p>}</Card>
   </>
 }
 

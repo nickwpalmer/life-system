@@ -78,7 +78,7 @@ export function SchoolPanel() {
           {d.course && <span class="faint tiny">{d.course}</span>}
         </div>
       </>) : <p class="empty" style="padding:8px">Nothing due in the next two weeks.</p>}
-      <p class="faint tiny" style="margin-top:8px">C items come from your Canvas feed, which isn’t always right about calc dates. The rest are dates from your syllabi.</p>
+      {shown.some((d) => d.from === 'canvas') && <p class="faint tiny" style="margin-top:8px">C items come from your Canvas feed, which isn’t always right about calc dates. The rest are dates from your syllabi.</p>}
     </Card>
     {nextClass.size > 0 && <Card title="Classes this week" icon="school">
       {[...nextClass].map(([title, at]) => <div class="row between small fin-row"><span>{title}</span><span class="faint">{fmtWeekday(dayKey(new Date(at)))} {clock(at)}</span></div>)}
