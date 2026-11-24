@@ -48,7 +48,7 @@ export function demoData(): Data {
     T('Ask about Dec shift swap', 'work', { due_date: inDays(1) }),
     T('Call about health insurance', 'finances', { priority: 1 }),
     T('Book dentist cleaning', 'health'),
-    T('Gift for Kalle', 'relationships', { due_date: inDays(9), priority: 2 }),
+    T('Gift for Alex', 'relationships', { due_date: inDays(9), priority: 2 }),
     T('Print hand parts for e-Nable', 'growth'),
     T('Order new desk lamp', 'home', { tags: ['someday'] }),
     T('look into summer research programs', 'education', { status: 'inbox', area_id: null }),
@@ -57,7 +57,7 @@ export function demoData(): Data {
   ]
   const checkins: Checkin[] = days.slice(-10).flatMap((d, i) => [
     { id: id(), kind: 'morning' as const, day: d, mood: 6 + (i % 3), energy: 6, stress: 4, focus: null, sleep_quality: 7, intention: 'Stay on top of classes', top_three: ['Problem set', 'Gym', 'Call home'], gratitude: ['Coffee'], win: null, lesson: null, reflection: null, data: {} },
-    { id: id(), kind: 'night' as const, day: d, mood: 7, energy: 5, stress: 3, focus: 6, sleep_quality: null, intention: null, top_three: [], gratitude: [], win: i % 2 ? 'Finished the lab early' : 'Good talk with Liz', lesson: 'Start problem sets earlier', reflection: null, data: {} },
+    { id: id(), kind: 'night' as const, day: d, mood: 7, energy: 5, stress: 3, focus: 6, sleep_quality: null, intention: null, top_three: [], gratitude: [], win: i % 2 ? 'Finished the lab early' : 'Good talk with Sam', lesson: 'Start problem sets earlier', reflection: null, data: {} },
   ])
   const ev = (d: string, h: number, title: string, cal: string, dur = 1): CalEvent => { const s = new Date(d + 'T00:00:00'); s.setHours(h); return { id: id(), title, starts_at: s.toISOString(), ends_at: new Date(s.getTime() + dur * 3600e3).toISOString(), all_day: false, location: null, calendar_name: cal } }
   const events: CalEvent[] = []
@@ -65,10 +65,10 @@ export function demoData(): Data {
     const d = dayKey(addDays(new Date(), i)); const wd = addDays(new Date(), i).getDay()
     if (wd >= 1 && wd <= 5) { events.push(ev(d, 9, 'SEM 100 lecture', 'School', 1.25)); if (wd % 2) events.push(ev(d, 13, 'MATH 101', 'School')) }
     if (wd === 6) events.push(ev(d, 10, 'Prime IV shift', 'Work', 6))
-    if (wd === 3) events.push(ev(d, 19, 'Dinner with Liz', 'Personal', 2))
+    if (wd === 3) events.push(ev(d, 19, 'Dinner with Sam', 'Personal', 2))
   }
   return {
-    profile: { id: 'demo', display_name: 'Nick', timezone: 'America/Detroit', settings: {} },
+    profile: { id: 'demo', display_name: 'Jordan', timezone: 'America/Detroit', settings: {} },
     areas, metrics, tasks, logs, checkins, events,
     journal: [{ id: id(), area_id: null, title: 'Sunday reset', body: 'Felt scattered this week. Too many small things in my head. Writing them all down helped.', mood: 6, tags: [], occurred_at: addDays(new Date(), -2).toISOString() }],
     notes: [{ id: id(), area_id: A('education'), title: 'Class schedule', body: 'Mon/Wed/Fri 9:00 SEM 100\nTue/Thu 1:00 MATH 101', pinned: true, tags: [], updated_at: new Date().toISOString() },
@@ -77,8 +77,8 @@ export function demoData(): Data {
       { id: id(), area_id: A('education'), title: 'Finish the semester with a 3.7+', why: 'Keeps the fellowship options open', status: 'active', target_date: inDays(24), suggested: false, next_step: 'Make a study plan for finals week', progress: 40, sort: 0, horizon: 'semester', created_at: '' },
       { id: id(), area_id: A('mental'), title: 'Build a steady sleep routine', why: 'I think better on 7+ hours', status: 'active', target_date: null, suggested: true, next_step: null, progress: 0, sort: 1, horizon: 'month', created_at: '' },
     ],
-    people: [{ id: id(), name: 'Liz', relation: 'Partner', birthday: null, contact_every_days: null, last_contact: today(), notes: null },
-      { id: id(), name: 'Kalle Palmer', relation: 'Family', birthday: '12-05', contact_every_days: 14, last_contact: inDays(-20), notes: null }],
+    people: [{ id: id(), name: 'Sam', relation: 'Partner', birthday: null, contact_every_days: null, last_contact: today(), notes: null },
+      { id: id(), name: 'Alex Rivera', relation: 'Family', birthday: '12-05', contact_every_days: 14, last_contact: inDays(-20), notes: null }],
     reviews: [{ id: id(), week_start: dayKey(addDays(weekStart(), -7)), wins: 'Caught up on classes', lessons: 'Start earlier', focus: ['Finals plan', 'Sleep by 12', 'Call home'], rating: 7, data: {} }],
     synced_at: new Date(Date.now() - 40 * 60e3).toISOString(),
   }

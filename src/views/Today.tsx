@@ -131,14 +131,14 @@ function NextUp() {
     .sort((a, b) => a.starts_at.localeCompare(b.starts_at)).slice(0, 3)
   if (!list.length) return null
   return (
-    <a class="card nextup" href="#/calendar">
+    <section class="card nextup">
       {list.map((e) => (
-        <div class="event" style={`--c:${calColor(e.calendar_name)}`}>
+        <a class="event" href="#/calendar" style={`--c:${calColor(e.calendar_name)}`}>
           <span class="when">{eventDay(e) !== t ? 'Tmrw' : e.all_day ? 'All day' : fmtTime(e.starts_at)}</span><span class="bar-v" />
           <span class="grow ellipsis">{e.title}</span>
-        </div>
+        </a>
       ))}
-    </a>
+    </section>
   )
 }
 
@@ -204,7 +204,7 @@ function ComingUp() {
 
 export function Today() {
   const profile = useStore((s) => s.profile)
-  const name = profile?.display_name || 'Nick'
+  const name = profile?.display_name || 'there'
   const greet = { morning: 'Good morning', afternoon: 'Good afternoon', evening: 'Good evening', night: 'Hey' }[partOfDay()]
   return (
     <div class="home">

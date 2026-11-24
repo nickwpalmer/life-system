@@ -545,8 +545,7 @@ button.tile { text-align: left; font: inherit; cursor: pointer; }
 .g-row:last-child { border-bottom: 0; }
 .pill.late { --c: var(--coral); }
 .g-inbox { display: flex; align-items: center; gap: 10px; margin-top: 12px; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--violet) 12%, transparent); color: var(--text); text-decoration: none; font-size: 14px; }
-.nextup a { display: flex; align-items: center; gap: 12px; padding: 8px 0; color: inherit; text-decoration: none; border-bottom: 1px solid var(--line); }
-.nextup a:last-child { border-bottom: 0; }
+.nextup a { color: inherit; text-decoration: none; }
 .gap { display: flex; align-items: center; gap: 12px; padding: 9px 0; color: var(--text); text-decoration: none; border-bottom: 1px solid var(--line); font-size: 14.5px; }
 .gap:last-child { border-bottom: 0; }
 .gap .m-ico { width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center; flex: none; background: color-mix(in srgb, var(--c) 16%, transparent); color: var(--c); }

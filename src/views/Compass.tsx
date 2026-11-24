@@ -12,7 +12,7 @@ export const useCompass = () => useStore((s) => (s.profile?.settings?.compass ??
 const FIELDS: [keyof Compass, string, string][] = [
   ['mission', 'Who you’re becoming', 'One line. e.g. A biomedical engineer who builds things that help people, and stays kind and steady doing it.'],
   ['values', 'What you value most', 'Three to five words. e.g. Curiosity, health, loyalty, craft'],
-  ['ideal', 'A year from now, life is good if…', 'Concrete. e.g. Strong GPA, a lab or internship spot, sleeping 7+ hours, money saved, close with Liz and family'],
+  ['ideal', 'A year from now, life is good if…', 'Concrete. e.g. Strong GPA, a lab or internship spot, sleeping 7+ hours, money saved, close with the people who matter'],
   ['now', 'What’s in the way right now', 'Honest and short. e.g. I put off problem sets until the night before'],
 ]
 
