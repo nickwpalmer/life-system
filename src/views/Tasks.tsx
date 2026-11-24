@@ -128,8 +128,8 @@ type View = 'home' | 'inbox' | 'today' | 'upcoming' | 'someday' | 'done'
 
 /** Which class a task belongs to, from a tag like MAT-2010 or the course code in its title. */
 export function courseOf(t: Task): string | null {
-  for (const g of t.tags ?? []) { const m = g.match(/^([A-Z]{2,4})[- ]?(\d{4})$/i); if (m) return `${m[1].toUpperCase()} ${m[2]}` }
-  const m = t.title.match(/\b([A-Z]{2,4})[ -]?(\d{4})\b/)
+  for (const g of t.tags ?? []) { const m = g.match(/^([A-Z]{2,4})[- ]?(\d{3,4})$/i); if (m) return `${m[1].toUpperCase()} ${m[2]}` }
+  const m = t.title.match(/\b([A-Z]{2,4})[ -]?(\d{3,4})\b/)
   return m ? `${m[1]} ${m[2]}` : null
 }
 export const KINDS = [

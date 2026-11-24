@@ -41,7 +41,7 @@ export function demoData(): Data {
   })
   const T = (title: string, area: string, extra: Partial<Task> = {}): Task => ({ id: id(), title, area_id: A(area), goal_id: null, notes: null, status: 'open', priority: 0, due_date: null, due_time: null, scheduled_for: null, estimate_min: null, completed_at: null, created_at: new Date().toISOString(), tags: [], ...extra })
   const tasks: Task[] = [
-    T('BME problem set 6', 'education', { due_date: today(), priority: 3, tags: ['BME-1900'] }),
+    T('Problem set 6', 'education', { due_date: today(), priority: 3, tags: ['SEM-100'] }),
     T('Read chapter 9 for MAT-2010', 'education', { due_date: inDays(2), priority: 2, tags: ['MAT-2010'] }),
     T('Lab report draft', 'education', { due_date: inDays(-1), priority: 2, tags: ['BE-1200'] }),
     T('Honors reflection essay', 'education', { due_date: inDays(6), priority: 2, tags: ['HON-1000'] }),
@@ -56,14 +56,14 @@ export function demoData(): Data {
     T('Finish MAT quiz 8', 'education', { status: 'done', completed_at: new Date().toISOString() }),
   ]
   const checkins: Checkin[] = days.slice(-10).flatMap((d, i) => [
-    { id: id(), kind: 'morning' as const, day: d, mood: 6 + (i % 3), energy: 6, stress: 4, focus: null, sleep_quality: 7, intention: 'Stay on top of BME', top_three: ['Problem set', 'Gym', 'Call home'], gratitude: ['Coffee'], win: null, lesson: null, reflection: null, data: {} },
+    { id: id(), kind: 'morning' as const, day: d, mood: 6 + (i % 3), energy: 6, stress: 4, focus: null, sleep_quality: 7, intention: 'Stay on top of classes', top_three: ['Problem set', 'Gym', 'Call home'], gratitude: ['Coffee'], win: null, lesson: null, reflection: null, data: {} },
     { id: id(), kind: 'night' as const, day: d, mood: 7, energy: 5, stress: 3, focus: 6, sleep_quality: null, intention: null, top_three: [], gratitude: [], win: i % 2 ? 'Finished the lab early' : 'Good talk with Liz', lesson: 'Start problem sets earlier', reflection: null, data: {} },
   ])
   const ev = (d: string, h: number, title: string, cal: string, dur = 1): CalEvent => { const s = new Date(d + 'T00:00:00'); s.setHours(h); return { id: id(), title, starts_at: s.toISOString(), ends_at: new Date(s.getTime() + dur * 3600e3).toISOString(), all_day: false, location: null, calendar_name: cal } }
   const events: CalEvent[] = []
   for (let i = -3; i < 10; i++) {
     const d = dayKey(addDays(new Date(), i)); const wd = addDays(new Date(), i).getDay()
-    if (wd >= 1 && wd <= 5) { events.push(ev(d, 9, 'BME 1900 lecture', 'School', 1.25)); if (wd % 2) events.push(ev(d, 13, 'MAT 2010', 'School')) }
+    if (wd >= 1 && wd <= 5) { events.push(ev(d, 9, 'SEM 100 lecture', 'School', 1.25)); if (wd % 2) events.push(ev(d, 13, 'MATH 101', 'School')) }
     if (wd === 6) events.push(ev(d, 10, 'Prime IV shift', 'Work', 6))
     if (wd === 3) events.push(ev(d, 19, 'Dinner with Liz', 'Personal', 2))
   }
@@ -71,7 +71,7 @@ export function demoData(): Data {
     profile: { id: 'demo', display_name: 'Nick', timezone: 'America/Detroit', settings: {} },
     areas, metrics, tasks, logs, checkins, events,
     journal: [{ id: id(), area_id: null, title: 'Sunday reset', body: 'Felt scattered this week. Too many small things in my head. Writing them all down helped.', mood: 6, tags: [], occurred_at: addDays(new Date(), -2).toISOString() }],
-    notes: [{ id: id(), area_id: A('education'), title: 'Class schedule', body: 'Mon/Wed/Fri 9:00 BME 1900\nTue/Thu 1:00 MAT 2010', pinned: true, tags: [], updated_at: new Date().toISOString() },
+    notes: [{ id: id(), area_id: A('education'), title: 'Class schedule', body: 'Mon/Wed/Fri 9:00 SEM 100\nTue/Thu 1:00 MATH 101', pinned: true, tags: [], updated_at: new Date().toISOString() },
       { id: id(), area_id: A('health'), title: 'Gym routine', body: 'Push / pull / legs, 45 min', pinned: false, tags: [], updated_at: new Date().toISOString() }],
     goals: [
       { id: id(), area_id: A('education'), title: 'Finish the semester with a 3.7+', why: 'Keeps the fellowship options open', status: 'active', target_date: inDays(24), suggested: false, next_step: 'Make a study plan for finals week', progress: 40, sort: 0, horizon: 'semester', created_at: '' },
@@ -79,7 +79,7 @@ export function demoData(): Data {
     ],
     people: [{ id: id(), name: 'Liz', relation: 'Partner', birthday: null, contact_every_days: null, last_contact: today(), notes: null },
       { id: id(), name: 'Kalle Palmer', relation: 'Family', birthday: '12-05', contact_every_days: 14, last_contact: inDays(-20), notes: null }],
-    reviews: [{ id: id(), week_start: dayKey(addDays(weekStart(), -7)), wins: 'Caught up on BME', lessons: 'Start earlier', focus: ['Finals plan', 'Sleep by 12', 'Call home'], rating: 7, data: {} }],
+    reviews: [{ id: id(), week_start: dayKey(addDays(weekStart(), -7)), wins: 'Caught up on classes', lessons: 'Start earlier', focus: ['Finals plan', 'Sleep by 12', 'Call home'], rating: 7, data: {} }],
     synced_at: new Date(Date.now() - 40 * 60e3).toISOString(),
   }
 }

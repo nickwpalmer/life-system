@@ -21,15 +21,15 @@ const COURSE_COLORS = ['#a98bff', '#ffa463', '#79e2b4', '#ff8cc8', '#8fc4ff', '#
 
 // ---------- demo data (made up; the real rows live in your database) ----------
 registerDemo('courses', () => [
-  ['MAT 2010', 'Calculus I', 4], ['BE 1200', 'Basic Engineering I', 3], ['BME 1900', 'BME Freshman Seminar', 1], ['HON 1000', 'The City', 4],
-].map(([code, name, cr], i) => ({ id: `c${i}`, code, name, term: 'Fall 2026', credits: cr, instructor: null, meets: i % 2 ? 'Tue/Thu' : 'Mon/Wed', color: null, starts_on: '2026-08-31', ends_on: '2026-12-23', status: 'current', grade: null, sort: i })) as never)
+  ['MATH 101', 'Calculus I', 4], ['ENGR 110', 'Intro to Engineering', 3], ['SEM 100', 'First-year Seminar', 1], ['WRIT 150', 'Writing Studio', 3],
+].map(([code, name, cr], i) => ({ id: `c${i}`, code, name, term: 'Fall 2026', credits: cr, instructor: null, meets: i % 2 ? 'Tue/Thu' : 'Mon/Wed', color: null, starts_on: '2026-09-01', ends_on: '2026-12-18', status: 'current', grade: null, sort: i })) as never)
 registerDemo('degree_reqs', () => ([
-  ['Math', 'MAT 2010', 'Calculus I', 4, 'in_progress'], ['Math', 'MAT 2020', 'Calculus II', 4, 'planned'], ['Math', 'MAT 2030', 'Calculus III', 4, 'needed'],
-  ['Basic science', 'CHM 1125', 'General Chemistry I', 4, 'pending'], ['Basic science', 'PHY 2170', 'Physics I', 4, 'planned'],
-  ['BME core', 'BME 1900', 'Freshman Seminar', 1, 'in_progress'], ['BME core', 'BME 3010', 'Transport', 3, 'needed'],
-  ['Writing and gen ed', 'ENG 1020', 'College Writing', 3, 'done'], ['Transfer credit', null, 'Transfer electives', 40, 'done'],
+  ['Math', 'MATH 101', 'Calculus I', 4, 'in_progress'], ['Math', 'MATH 102', 'Calculus II', 4, 'planned'], ['Math', 'MATH 201', 'Calculus III', 4, 'needed'],
+  ['Basic science', 'CHEM 101', 'General Chemistry I', 4, 'pending'], ['Basic science', 'PHYS 101', 'Physics I', 4, 'planned'],
+  ['Major core', 'SEM 100', 'First-year Seminar', 1, 'in_progress'], ['Major core', 'ENGR 300', 'Transport', 3, 'needed'],
+  ['Writing and gen ed', 'WRIT 101', 'College Writing', 3, 'done'], ['Transfer credit', null, 'Transfer electives', 40, 'done'],
   ['Open items', null, 'Choose a concentration', 0, 'open'],
-] as const).map(([grp, code, title, credits, status], i) => ({ id: `r${i}`, program: 'BSBME Honors', grp, code, title, credits, status, term: status === 'planned' ? 'Winter 2027' : null, grade: null, notes: null, sort: i })) as never)
+] as const).map(([grp, code, title, credits, status], i) => ({ id: `r${i}`, program: 'BS Engineering', grp, code, title, credits, status, term: status === 'planned' ? 'Winter 2027' : null, grade: null, notes: null, sort: i })) as never)
 registerDemo('scholarships', () => [
   { id: 's1', name: 'Transfer award', sponsor: 'University', amount: 2000, amount_note: null, deadline: null, decision_on: null, url: null, requirements: null, notes: null, renewable: true, status: 'awarded' },
   { id: 's2', name: 'Engineering society scholarship', sponsor: null, amount: 1500, amount_note: null, deadline: '2027-02-01', decision_on: null, url: null, requirements: 'Essay', notes: null, renewable: false, status: 'to_apply' },
@@ -67,7 +67,8 @@ function Overview() {
   const cur = (courses ?? []).filter((c) => c.status === 'current')
   const pct = cur.length ? termPct(cur[0]) : null
   const left = cur[0]?.ends_on ? daysUntil(cur[0].ends_on) : null
-  const main = (reqs ?? []).filter((r) => r.program !== 'Minor in ECE')
+  const first = reqs?.[0]?.program
+  const main = (reqs ?? []).filter((r) => r.program === first)
   const done = main.filter((r) => r.status === 'done' || r.status === 'waived').reduce((a, r) => a + Number(r.credits ?? 0), 0)
   const prog = main.filter((r) => r.status === 'in_progress').reduce((a, r) => a + Number(r.credits ?? 0), 0)
   const open = main.filter((r) => r.status === 'open' || r.status === 'pending').length
@@ -99,7 +100,7 @@ function Overview() {
       {reqs && (
         <a class="card prompt" href="#/school/degree" style="--accent:var(--gold)">
           <span class="orb"><Icon name="degree" size={22} /></span>
-          <span class="grow"><h3>{done} credits done{prog ? `, ${prog} in progress` : ''}</h3><p class="muted small">BSBME Honors plan{open ? ` · ${open} open item${open === 1 ? '' : 's'}` : ''}</p></span><Icon name="chev" />
+          <span class="grow"><h3>{done} credits done{prog ? `, ${prog} in progress` : ''}</h3><p class="muted small">{first} plan{open ? ` · ${open} open item${open === 1 ? '' : 's'}` : ''}</p></span><Icon name="chev" />
         </a>
       )}
     </>
@@ -146,10 +147,11 @@ const ST: Record<Req['status'], [string, string]> = {
 }
 function Degree() {
   const reqs = useRows<Req>('degree_reqs')
-  const [prog, setProg] = useState('BSBME Honors')
+  const [pick, setProg] = useState<string | null>(null)
   const [by, setBy] = useState<'group' | 'term'>('group')
   const [open, setOpen] = useState<Req | null>(null)
   const programs = [...new Set((reqs ?? []).map((r) => r.program))]
+  const prog = pick ?? programs[0]
   const rows = (reqs ?? []).filter((r) => r.program === prog)
   const items = rows.filter((r) => r.grp !== 'Open items')
   const todo = rows.filter((r) => r.grp === 'Open items' && r.status !== 'done')
@@ -190,7 +192,7 @@ function Degree() {
           </Card>
         )
       })}
-      <p class="faint tiny" style="margin:4px 6px 16px">Built from your Degree Works audit and the honors path. Tap a row to change its status.</p>
+      <p class="faint tiny" style="margin:4px 6px 16px">Built from your degree audit and plan. Tap a row to change its status.</p>
       <Sheet open={!!open} onClose={() => setOpen(null)} title={open?.code ?? 'Requirement'}>
         {open && <>
           <p style="margin-bottom:6px">{open.title}</p>
@@ -305,12 +307,15 @@ function Scholarships() {
 }
 
 export function Education({ tab }: { tab?: string }) {
+  const schools = useRows<School>('edu_schools')
   if (tab?.startsWith('c-')) return <ClassPage code={tab.slice(2).replace(/-/g, ' ')} />
   const t = tab ?? 'overview'
+  const now = schools?.find((x) => !x.ended) ?? schools?.[schools.length - 1]
+  const sub = now ? [now.name, now.credential].filter(Boolean).join(' · ') : 'Classes, degree, history'
   const tabs: [string, string][] = [['overview', 'This term'], ['degree', 'Degree plan'], ['money', 'Scholarships'], ['history', 'History']]
   return (
     <>
-      <PageHead title="Education" sub="Wayne State · BSBME Honors" icon="school" color="var(--lilac)" />
+      <PageHead title="Education" sub={sub} icon="school" color="var(--lilac)" />
       <div class="chips scroll" style="margin-bottom:14px">{tabs.map(([k, l]) => <a class={`chip ${t === k ? 'on' : ''}`} href={`#/school${k === 'overview' ? '' : `/${k}`}`}>{l}</a>)}</div>
       {t === 'degree' ? <Degree /> : t === 'money' ? <Scholarships /> : t === 'history' ? <History /> : <Overview />}
     </>
