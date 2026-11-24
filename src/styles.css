@@ -761,3 +761,4 @@ body:has(.flow) nav.nav, body:has(.flow) .fab { display: none; }
 .tcheck .tbox { width: 20px; height: 20px; border-radius: 7px; border: 1.5px solid var(--faint); display: grid; place-items: center; flex: none; color: transparent; margin-top: 1px; }
 .tcheck.on .tbox { background: var(--mint); border-color: var(--mint); color: var(--bg); }
 .tcheck.on .grow { color: var(--faint); text-decoration: line-through; }
+.gwarn { margin-top: 8px; padding: 9px 11px; border-radius: 12px; font-size: 13px; background: color-mix(in srgb, var(--coral) 14%, var(--surface-2)); color: var(--text); }

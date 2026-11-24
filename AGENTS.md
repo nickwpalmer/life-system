@@ -91,6 +91,7 @@ Areas (`areas.key`): `education`, `mental`, `finances`, `health`, `work`, `relat
 
 - A course's weights live in `courses.data.grading`: a list of `{cat, weight, rule?, pass?, maxMissing?}`. `rule: 'complete'` means the category counts incompletes (an item scoring under `pass`% or marked missing) and is all-or-nothing past `maxMissing`. Keep any existing keys in `data` when you change it.
 - When the owner tells you a score, update that item's `score`/`possible` and set `status='graded'`. When Canvas and another source disagree on a date, the app follows Canvas unless the owner says otherwise; note the other date in `note`.
+- Homework past its due date with `status='todo'` shows as "unsure" and counts toward the incomplete risk, so mark homework `graded`, `done` or `missing` as soon as you know.
 - A task can hold a checklist in `notes`, one step per line as `- [ ] step` or `- [x] step`. The app shows these as tappable boxes. Don't create sub-tasks with `parent_id`; the app doesn't show them.
 
 ## Reports

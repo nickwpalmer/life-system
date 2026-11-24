@@ -39,10 +39,13 @@ export function catStanding(c: Cat, items: Item[]) {
     const inc = mine.filter((i) => i.status === 'missing' || (i.score != null && (pctOf(i) ?? 0) < pass)).length
     const known = mine.filter((i) => i.status === 'missing' || i.score != null || i.status === 'done').length
     const max = c.maxMissing ?? Infinity
-    return { pct: known ? (inc <= max ? 100 : 0) : null, inc, left: max === Infinity ? null : max - inc, n: mine.length }
+    // Past due with nothing recorded: might be an incomplete, so it counts as a risk until you mark it.
+    const t0 = new Date().toISOString().slice(0, 10)
+    const maybe = mine.filter((i) => i.status === 'todo' && i.due_on && i.due_on < t0).length
+    return { pct: known ? (inc <= max ? 100 : 0) : null, inc, maybe, left: max === Infinity ? null : max - inc, n: mine.length }
   }
   const g = mine.map(pctOf).filter((v): v is number => v != null)
-  return { pct: g.length ? g.reduce((a, b) => a + b, 0) / g.length : null, inc: 0, left: null, n: mine.length }
+  return { pct: g.length ? g.reduce((a, b) => a + b, 0) / g.length : null, inc: 0, maybe: 0, left: null, n: mine.length }
 }
 
 export function computeGrade(cats: Cat[], items: Item[]) {
@@ -50,6 +53,21 @@ export function computeGrade(cats: Cat[], items: Item[]) {
   const rows = cats.map((c) => { const st = catStanding(c, items); if (c.weight && st.pct != null) { s += c.weight * st.pct; w += c.weight; if (c.rule !== 'complete') scored += c.weight } return { c, ...st } })
   // A completion category alone (homework done or not) says little about the grade, so wait for real scores.
   return { pct: w && scored ? s / w : null, rows, weighted: scored ? w : 0, unweighted: cats.filter((c) => c.weight == null).map((c) => c.cat) }
+}
+
+/**
+ * Two what-ifs: nothing else gets turned in (everything open scores 0, open homework counts as incomplete),
+ * and full catch-up (everything open scores full marks, incomplete homework gets redone).
+ * Items with a final grade stay as they are; the final exam is left out of both.
+ */
+function scenarios(cats: Cat[], items: Item[]) {
+  const fin = cats.find((c) => /final/i.test(c.cat))
+  const rest = cats.filter((c) => c !== fin)
+  const open = (i: Item) => i.status === 'todo' || i.status === 'missing'
+  const none = items.map((i) => i.status === 'todo' ? { ...i, status: 'missing' as const, score: 0, possible: i.possible ?? 100 } : i)
+  const all = items.map((i) => open(i) ? { ...i, status: 'graded' as const, score: i.possible ?? 100, possible: i.possible ?? 100 } : i)
+  const a = computeGrade(rest, none).pct, b = computeGrade(rest, all).pct
+  return a == null || b == null ? null : { none: a, all: b }
 }
 
 /** What the final needs for each letter, if everything else stays where it is. */
@@ -85,6 +103,8 @@ export function GradeTracker({ course, color }: { course: CourseLike; color: str
   )
   const g = computeGrade(cats, items)
   const needs = finalNeeds(cats, items)
+  const sc = scenarios(cats, items)
+  const hw = g.rows.find((r) => r.c.rule === 'complete' && r.left != null)
   const t0 = today()
   const upcoming = items.filter((i) => i.status === 'todo' && i.due_on && i.due_on >= t0).sort((a, b) => a.due_on!.localeCompare(b.due_on!))
   const unscored = items.filter((i) => i.status === 'todo' && i.due_on && i.due_on < t0)
@@ -108,8 +128,11 @@ export function GradeTracker({ course, color }: { course: CourseLike; color: str
       <div class="gcats">{g.rows.map((r) => (
         <div class="gcat"><span class="ellipsis">{r.c.cat}</span>
           <b>{r.c.rule === 'complete' ? (r.left != null ? `${r.inc} incomplete` : `${r.inc} short`) : r.pct != null ? `${fmt(r.pct)}%` : '–'}</b>
-          <span class="faint tiny">{r.c.weight != null ? `${r.c.weight}%` : 'weight?'}{r.c.rule === 'complete' && r.left != null ? (r.left >= 0 ? ` · ${r.left} to spare` : ' · over the limit') : ''}</span></div>
+          <span class="faint tiny">{r.c.weight != null ? `${r.c.weight}%` : 'weight?'}{r.c.rule === 'complete' && r.left != null ? (r.left >= 0 ? ` · ${r.left} to spare` : ' · over the limit') : ''}{r.maybe ? ` · ${r.maybe} unsure` : ''}</span></div>
       ))}</div>
+      {hw && hw.maybe > 0 && hw.left != null && hw.left - hw.maybe < 0 && <div class="gwarn">{hw.c.cat}: {hw.inc} incomplete, {hw.maybe} past due and not marked. If {hw.maybe === 1 ? 'that one is' : 'those are'} incomplete too, you’re at {hw.inc + hw.maybe} of {hw.inc + hw.left} allowed and lose the whole {hw.c.weight}%. Mark {hw.maybe === 1 ? 'it' : 'them'} below.</div>}
+      {hw && hw.left != null && hw.left < 0 && <div class="gwarn">{hw.c.cat}: {hw.inc} incomplete is over the limit of {hw.inc + hw.left}, so the whole {hw.c.weight}% is gone unless some get redone.</div>}
+      {sc && <div class="row" style="gap:8px;margin-top:8px"><div class="gcat grow"><span>If nothing else is turned in</span><b>{fmt(sc.none)}%</b></div><div class="gcat grow"><span>With full catch-up</span><b>{fmt(sc.all)}%</b></div></div>}
       {g.unweighted.length > 0 && <p class="faint tiny" style="margin-top:6px">{g.unweighted.join(', ')} {g.unweighted.length === 1 ? 'has' : 'have'} no weight yet, so {g.unweighted.length === 1 ? 'it isn’t' : 'they aren’t'} in the grade. Tap Weights to add them from the syllabus.</p>}
       {needs && <div class="gneeds"><div class="faint tiny" style="margin-bottom:4px">On the final, you’d need</div>
         <div class="row" style="gap:6px;flex-wrap:wrap">{needs.map((n) => <span class="pill" style={`--c:${n.need > 100 ? 'var(--faint)' : n.need <= 0 ? 'var(--mint)' : color}`}>{n.l}: {n.need > 100 ? 'out of reach' : n.need <= 0 ? 'locked in' : `${Math.ceil(n.need)}%`}</span>)}</div>
