@@ -104,7 +104,7 @@ function Mental() {
     <Card title="Mood and anxiety" icon="heart" accent="var(--pink)">
       <LineChart days={days} min={1} max={10} series={[{ label: 'Mood', color: '#ff8cc8', values: mood }, { label: 'Anxiety', color: '#8fc4ff', values: anx }]} />
       <div class="legend"><span><i class="dot" style="background:#ff8cc8" /> Mood</span><span><i class="dot" style="background:#8fc4ff" /> Anxiety</span></div>
-      {withMed != null && without != null && mood.filter((v) => v != null).length >= 10 && <p class="small" style="margin-top:10px">On days you meditated, mood averaged <b>{withMed.toFixed(1)}</b> vs <b>{without.toFixed(1)}</b> on days you didn’t.</p>}
+      {withMed != null && without != null && Math.abs(withMed - without) >= 0.3 && mood.filter((v) => v != null).length >= 10 && <p class="small" style="margin-top:10px">On days you meditated, mood averaged <b>{withMed.toFixed(1)}</b> vs <b>{without.toFixed(1)}</b> on days you didn’t.</p>}
     </Card>
     <div class="tiles three">
       <button class="tile" style="--c:var(--sky)" onClick={() => setBreathe(true)}><div class="t-name">Breathe</div><div class="t-sub">One minute, guided</div></button>

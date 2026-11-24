@@ -1,3 +1,4 @@
+import { createPortal } from 'preact/compat'
 import type { ComponentChildren } from 'preact'
 import { useEffect, useState } from 'preact/hooks'
 import { useStore, setState } from '../lib/store'
@@ -18,7 +19,8 @@ export function Sheet({ open, onClose, children, title, wide }: { open: boolean;
     return () => { removeEventListener('keydown', f); document.body.classList.remove('noscroll') }
   }, [open])
   if (!shown) return null
-  return (
+  // Portal to <body>: an animated ancestor (the page-enter transform) would otherwise trap position:fixed.
+  return createPortal(
     <>
       <div class={`scrim ${leaving ? 'out' : ''}`} onClick={onClose} />
       <div class={`sheet ${wide ? 'wide' : ''} ${leaving ? 'out' : ''}`} role="dialog" aria-modal="true">
@@ -26,7 +28,8 @@ export function Sheet({ open, onClose, children, title, wide }: { open: boolean;
         {title && <div class="sheet-h"><h2>{title}</h2><button class="icon-btn sm" aria-label="Close" onClick={onClose}><Icon name="x" size={18} /></button></div>}
         {children}
       </div>
-    </>
+    </>,
+    document.body,
   )
 }
 
