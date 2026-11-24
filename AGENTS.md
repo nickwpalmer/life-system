@@ -46,7 +46,7 @@ select id, kind, change_id, body, created_at from claude_inbox where status = 'o
 | A school deadline, exam or term date | `key_dates` | `kind` in deadline, exam, term, event; `area_key='education'`; `course` like `MAT 2010`. |
 | A class taken, grade, transfer credit | `edu_courses` / `courses` / `degree_reqs` | History, current or planned classes, degree plan. |
 | A scholarship or grant | `scholarships` | `status` in maybe, to_apply, applied, awarded, declined, missed. |
-| A graded item in a class (homework, quiz, test, final) | `grade_items` | `course_id`, `category` (must match a name in that course's `data.grading`), `name`, `score`, `possible` (blank means score is a percent), `due_on`, `status` in todo, done (turned in, no score), graded, missing (incomplete), excused (doesn't count), `note`. Update the existing row; don't add duplicates. |
+| A graded item in a class (homework, quiz, test, final) | `grade_items` | `course_id`, `category` (must match a name in that course's `data.grading`), `name`, `score`, `possible` (blank means score is a percent), `guess` (expected score in the same units until it's graded, used in the what-ifs), `due_on`, `status` in todo, done (turned in, no score), graded, missing (incomplete), excused (doesn't count), `note`. Update the existing row; don't add duplicates. |
 | A grade estimate for a current class | `grade_logs` | `course_id` (from `courses`), `estimate` (percent), `letter`, `note`, `logged_at`. One new row per estimate; it's a log over time. |
 | Something they own (apartment, clothes, electronics) | `inventory_items` | `list` (the inventory's name, e.g. `Electronics`), `name`, `qty`, `category` (group within the list), `location`, `value` (each, $), `acquired_on`, `notes`. |
 | A longer analysis of their data | `reports` | See Reports. |
@@ -89,7 +89,9 @@ Areas (`areas.key`): `education`, `mental`, `finances`, `health`, `work`, `relat
 
 ## Grades and checklists
 
-- A course's weights live in `courses.data.grading`: a list of `{cat, weight, rule?, pass?, maxMissing?}`. `rule: 'complete'` means the category counts incompletes (an item scoring under `pass`% or marked missing) and is all-or-nothing past `maxMissing`. Keep any existing keys in `data` when you change it.
+- A course's weights live in `courses.data.grading`: a list of `{cat, weight, rule?, pass?, maxMissing?, drop?, completion?, cap?}`. `rule: 'complete'` means the category counts incompletes (an item scoring under `pass`% or marked missing) and is all-or-nothing past `maxMissing`. `drop: N` drops the lowest N. `completion: true` means a turned-in item (`done`) earns full points. `cap: {below, letter}` notes a floor like "under 50% on the final caps the class at D+". Keep any existing keys in `data` when you change it.
+- Optional `courses.data.cutoffs` is a list of `[letter, min%]`, highest first (default A 93, A- 90, B+ 87 and so on). `courses.data.plan` is the class's catch-up plan: `## Section` lines and `- [ ] step` lines, worked top down. Tick steps (`- [x]`) when the owner says they're done.
+- Every point counts in the math, so give each item its real `possible`. Big runs of finished work can be one summary row (for example "Lessons 1 to 32", 32/32). An exam or quiz that's taken but not graded is `done` with a `guess`; replace the guess with `score` when it's graded.
 - When the owner tells you a score, update that item's `score`/`possible` and set `status='graded'`. When Canvas and another source disagree on a date, the app follows Canvas unless the owner says otherwise; note the other date in `note`.
 - Homework past its due date with `status='todo'` shows as "unsure" and counts toward the incomplete risk, so mark homework `graded`, `done` or `missing` as soon as you know.
 - A task can hold a checklist in `notes`, one step per line as `- [ ] step` or `- [x] step`. The app shows these as tappable boxes. Don't create sub-tasks with `parent_id`; the app doesn't show them.

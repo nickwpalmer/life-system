@@ -762,3 +762,8 @@ body:has(.flow) nav.nav, body:has(.flow) .fab { display: none; }
 .tcheck.on .tbox { background: var(--mint); border-color: var(--mint); color: var(--bg); }
 .tcheck.on .grow { color: var(--faint); text-decoration: line-through; }
 .gwarn { margin-top: 8px; padding: 9px 11px; border-radius: 12px; font-size: 13px; background: color-mix(in srgb, var(--coral) 14%, var(--surface-2)); color: var(--text); }
+.gtable { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.gtable th { text-align: right; font-weight: 500; color: var(--faint); padding: 3px 4px; font-size: 11px; }
+.gtable th:first-child, .gtable td:first-child { text-align: left; }
+.gtable td { text-align: right; padding: 4px; border-top: 1px solid var(--line); }
+.gtable tr.on td { color: var(--text); font-weight: 600; background: color-mix(in srgb, var(--accent, var(--violet)) 12%, transparent); }
