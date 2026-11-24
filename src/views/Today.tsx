@@ -136,7 +136,14 @@ function ComingUp() {
 
 function NextSteps() {
   const goals = useStore((s) => s.goals.filter((g) => g.status === 'active' && !g.suggested && g.next_step))
-  if (!goals.length) return null
+  const ideas = useStore((s) => s.goals.filter((g) => g.status === 'active' && g.suggested).length)
+  if (!goals.length) return ideas ? (
+    <a class="card soft prompt" href="#/goals" style="--accent:var(--gold)">
+      <span class="orb"><Icon name="target" size={22} /></span>
+      <span class="grow"><h3>{ideas} goal idea{ideas === 1 ? '' : 's'} for you</h3><p class="muted small">Keep the ones that fit, drop the rest. Each comes with a first step.</p></span>
+      <Icon name="chev" />
+    </a>
+  ) : null
   return (
     <Card title="Next steps on goals" icon="compass" accent="var(--gold)" action={<a class="link" href="#/goals">Goals</a>}>
       {goals.slice(0, 3).map((g) => <div style="padding:7px 0"><div class="faint small">{g.title}</div><div class="row" style="gap:6px;color:var(--peach)"><Icon name="arrow" size={15} />{g.next_step}</div></div>)}
