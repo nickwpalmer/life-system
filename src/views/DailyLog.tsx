@@ -139,7 +139,7 @@ export function DailyLog({ day }: { day: string }) {
       <div class="progress" style="margin:-4px 4px 16px"><i style={`width:${metrics.length ? (filled / metrics.length) * 100 : 0}%`} /></div>
       {isToday && slipping.length > 0 && (
         <div class="card soft flat small" style="padding:12px 14px">
-          <b>Don’t miss twice:</b> {slipping.map((m) => m.name.toLowerCase()).join(', ')} skipped the last two days. Even a tiny bit today keeps it alive.
+          <b>Don’t miss twice:</b> {slipping.map((m) => m.name.toLowerCase()).join(', ')} missed yesterday. A tiny version today keeps the habit alive.
         </div>
       )}
       <div class="grid-2"><div><LogGroups day={day} only={['mind', 'body']} /></div><div><LogGroups day={day} only={['habits', 'vices', 'money', 'other']} /></div></div>

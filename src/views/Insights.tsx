@@ -59,7 +59,7 @@ export function Insights() {
       <div class="metric-row">
         <div class="row between"><span>{m.name}</span><span class="small faint">{c.hit}/{c.n} days{st > 1 ? ` · ${st} in a row` : ''}</span></div>
         <div class="progress" style="margin:8px 0 4px"><i style={`width:${c.pct * 100}%`} /></div>
-        {c.lastTwoMissed && <div class="small" style="color:var(--peach)">Missed the last two days. Never miss twice: a tiny version today counts.</div>}
+        {c.lastTwoMissed && <div class="small" style="color:var(--peach)">Missed yesterday. Never miss twice: a tiny version today counts.</div>}
       </div>
     )
   }
