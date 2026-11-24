@@ -39,7 +39,8 @@ select id, kind, change_id, body, created_at from claude_inbox where status = 'o
 | A feeling, reflection, story | `journal_entries` | `body`, optional `title`, `mood` 1 to 10, `occurred_at` = when it happened. See Journal. |
 | A number for the day (slept 7h, mood 6) | `logs` | Daily entry; see Logs. |
 | Something taken (coffee, a drink, a supplement) | `substance_logs` | `substance`, `amount`, `unit`, `occurred_at`; `time_known=false` if no time given (use local noon). See Substances. |
-| A document or ID-type fact (insurance, registration, W-2) | `records` | See Records. |
+| A document or ID-type fact (insurance, registration, W-2) | `records` | See Records. If it belongs to the car or the apartment, set `asset_id` (see Assets). |
+| Anything about the car or the apartment (a repair, a to-do, a document) | `assets` + related tables | See Assets. |
 | A reference note, list or how-to | `notes` | `title`, `body`. |
 | A person, birthday, keep-in-touch | `people` | `name`, `relation`, `org`, `phone`, `email`, `birthday`, `contact_every_days`, `last_contact`, `notes`. Names in task titles link to the person's card, so use the same spelling. |
 | An outcome they want | `goals` | `status='active'`; if you're proposing it rather than they stated it, `suggested=true`. |
@@ -48,7 +49,7 @@ select id, kind, change_id, body, created_at from claude_inbox where status = 'o
 | A scholarship or grant | `scholarships` | `status` in maybe, to_apply, applied, awarded, declined, missed. |
 | A graded item in a class (homework, quiz, test, final) | `grade_items` | `course_id`, `category` (must match a name in that course's `data.grading`), `name`, `score`, `possible` (blank means score is a percent), `guess` (expected score in the same units until it's graded, used in the what-ifs), `due_on`, `status` in todo, done (turned in, no score), graded, missing (incomplete), excused (doesn't count), `note`. Update the existing row; don't add duplicates. |
 | A grade estimate for a current class | `grade_logs` | `course_id` (from `courses`), `estimate` (percent), `letter`, `note`, `logged_at`. One new row per estimate; it's a log over time. |
-| Something they own (apartment, clothes, electronics) | `inventory_items` | `list` (the inventory's name, e.g. `Electronics`), `name`, `qty`, `category` (group within the list), `location`, `value` (each, $), `acquired_on`, `notes`. |
+| Something they own (clothes, electronics, things in the apartment) | `inventory_items` | `list` (the inventory's name, e.g. `Electronics`), `name`, `qty`, `category` (group within the list), `location`, `value` (each, $), `acquired_on`, `notes`. |
 | A longer analysis of their data | `reports` | See Reports. |
 
 Areas (`areas.key`): `education`, `mental`, `finances`, `health`, `work`, `relationships`, `growth`, `home`. Put `area_id` on tasks, notes, goals and journal entries when the area is clear.
@@ -86,6 +87,16 @@ Areas (`areas.key`): `education`, `mental`, `finances`, `health`, `work`, `relat
 - `name`, `category` (insurance, vehicle, taxes, identity, accounts, medical, housing, school, other), `issuer`, `details` (plan, policy or member number, what it covers), `location` (where the original is: "glove box", "Drive > Taxes > 2025"), `link` (https only; normally a Google Drive link), `login_hint` (username or account email, and which site; **never a password**), `expires_on` (date or null), `renews` (true for registrations and licenses), `notes`, `pinned`.
 - Only set `expires_on` when there is a real date. Records with no date never show as expired.
 - Files are not uploaded to the app. Link to them in Google Drive.
+
+## Assets (car, apartment)
+
+Each asset has one page in the app (Records, top of the page) that pulls together everything below. File car and apartment items so they land there:
+
+- `assets`: `name`, `kind` in vehicle, home, other, `tag` (the task tag: `car` for the car, `apartment` for the apartment), `details`, `inventory_list`, `notes`. Look the row up by `tag`; don't add a second asset for the same thing.
+- **Documents** (registration, insurance, parking pass, lease, renters insurance) go in `records` with `asset_id` set to the asset's id. Keep `expires_on` real so the expiry warnings work.
+- **To-dos** go in `tasks` with the asset's tag in `tags` (e.g. `tags = '{car}'`) and the `home` area. Titles can still start "Car:".
+- **Maintenance and repairs done** go in `asset_logs`: `asset_id`, `done_on`, `what` (e.g. "Oil change"), `miles` (vehicles), `cost` ($), `where_done`, `notes`. One row per job.
+- **Things in the apartment** go in `inventory_items` with `list` = the asset's `inventory_list` (`Apartment`).
 
 ## Grades and checklists
 

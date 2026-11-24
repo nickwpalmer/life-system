@@ -3,6 +3,7 @@ import { useRows, addRow, patchRow, dropRow, registerDemo } from '../lib/rows'
 import { toast } from '../lib/store'
 import { daysUntil, fmtShort, fromKey, inDays } from '../lib/dates'
 import { Inventories } from './Inventory'
+import { AssetsStrip } from './Assets'
 import { Icon } from '../ui/icons'
 import { Sheet, PageHead, Switch, haptic } from '../ui/kit'
 
@@ -14,6 +15,7 @@ import { Sheet, PageHead, Switch, haptic } from '../ui/kit'
 export type Rec = {
   id: string; name: string; category: string; issuer: string | null; details: string | null; location: string | null
   link: string | null; login_hint: string | null; expires_on: string | null; renews: boolean; notes: string | null; pinned: boolean
+  asset_id?: string | null
   created_at?: string; updated_at?: string
 }
 
@@ -68,7 +70,7 @@ const blank = (): Partial<Rec> => ({ name: '', category: 'other', issuer: '', de
 const clean = (s: string | null | undefined) => (s ?? '').trim() || null
 const looksSecret = (s: string) => /\b\d{3}-\d{2}-\d{4}\b|password\s*[:=]|pwd\s*[:=]/i.test(s)
 
-function Editor({ rec, onClose }: { rec: Rec | Partial<Rec> | null; onClose: () => void }) {
+export function RecordEditor({ rec, onClose }: { rec: Rec | Partial<Rec> | null; onClose: () => void }) {
   const [f, setF] = useState<Partial<Rec>>(blank())
   useEffect(() => { if (rec) setF({ ...blank(), ...rec }) }, [rec])
   const isNew = !rec || !('id' in rec) || !rec.id
@@ -83,7 +85,7 @@ function Editor({ rec, onClose }: { rec: Rec | Partial<Rec> | null; onClose: () 
     if (looksSecret(all)) { toast('That looks like an SSN or a password. Leave those out.'); return }
     let link = clean(f.link)
     if (link && !/^https:\/\//i.test(link)) { if (/^http:\/\//i.test(link) || /\s/.test(link)) { toast('Links need to start with https://'); return } link = `https://${link}` }
-    const row = { name, category: f.category || 'other', issuer: clean(f.issuer), details: clean(f.details), location: clean(f.location), link, login_hint: clean(f.login_hint), expires_on: f.expires_on || null, renews: !!f.renews, notes: clean(f.notes), pinned: !!f.pinned }
+    const row = { name, category: f.category || 'other', issuer: clean(f.issuer), details: clean(f.details), location: clean(f.location), link, login_hint: clean(f.login_hint), expires_on: f.expires_on || null, renews: !!f.renews, notes: clean(f.notes), pinned: !!f.pinned, asset_id: f.asset_id ?? null }
     haptic(); onClose()
     try { if (isNew) await addRow('records', row); else await patchRow('records', (rec as Rec).id, row); toast('Saved') } catch { /* toast shown */ }
   }
@@ -157,6 +159,7 @@ export function Records() {
     <>
       <PageHead title="Records" sub={attention ? `${attention} need${attention === 1 ? 's' : ''} a look` : 'Documents and the facts you need fast'} back="#/more" icon="layers" color="var(--peach)"
         action={<button class="btn primary sm" onClick={() => setEdit(blank())}><Icon name="plus" size={16} />Add</button>} />
+      <AssetsStrip />
       {rows === null ? <div class="skeleton" /> : !rows.length ? (
         <div class="card soft"><p class="muted">Add the things you’d hate to dig for: insurance, car registration, tax returns, W-2s, your lease. Say where each original lives, and add the expiry date if it has one.</p></div>
       ) : (
@@ -171,7 +174,7 @@ export function Records() {
       )}
       <Inventories />
       <a class="card prompt" href="#/notes" style="--accent:var(--peach);margin-top:14px"><span class="orb"><Icon name="note" size={20} /></span><span class="grow"><h3>Notes</h3><p class="muted small">Lists, how-tos and anything else to keep</p></span><Icon name="chev" /></a>
-      <Editor rec={edit} onClose={() => setEdit(null)} />
+      <RecordEditor rec={edit} onClose={() => setEdit(null)} />
     </>
   )
 }

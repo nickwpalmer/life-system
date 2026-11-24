@@ -767,3 +767,12 @@ body:has(.flow) nav.nav, body:has(.flow) .fab { display: none; }
 .gtable th:first-child, .gtable td:first-child { text-align: left; }
 .gtable td { text-align: right; padding: 4px; border-top: 1px solid var(--line); }
 .gtable tr.on td { color: var(--text); font-weight: 600; background: color-mix(in srgb, var(--accent, var(--violet)) 12%, transparent); }
+
+/* Assets (top of Records) */
+.asset-grid { display: grid; gap: 8px; }
+.asset { display: flex; align-items: center; gap: 12px; padding: 12px; border-radius: 16px; background: var(--surface-2); border: 1px solid var(--line); color: var(--text); text-decoration: none; min-width: 0; transition: transform 0.18s var(--spring); }
+.asset:active { transform: scale(0.98); }
+.asset .m-ico { width: 38px; height: 38px; border-radius: 12px; display: grid; place-items: center; flex: none; background: color-mix(in srgb, var(--c) 18%, transparent); color: var(--c); }
+.asset > svg:last-child { color: var(--faint); flex: none; }
+.asset .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+@media (min-width: 720px) { .asset-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); } }

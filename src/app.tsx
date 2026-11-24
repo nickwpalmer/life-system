@@ -16,6 +16,7 @@ import { Insights } from './views/Insights'
 import { More } from './views/More'
 import { Notes } from './views/Notes'
 import { Records } from './views/Records'
+import { AssetPage } from './views/Assets'
 import { Calendar } from './views/Calendar'
 import { Settings } from './views/Settings'
 import { CheckinView } from './views/Checkin'
@@ -79,7 +80,7 @@ export const NAV: NavItem[] = [
   { r: 'review', icon: 'review', label: 'Weekly review', c: 'var(--lilac)', group: 'life', sub: 'Last week, next week' },
   { r: 'insights', icon: 'chart', label: 'Insights', c: 'var(--teal)', group: 'life', sub: 'Patterns and reviews' },
   { r: 'people', icon: 'users', label: 'People', c: 'var(--coral)', group: 'life', sub: 'Birthdays, keeping in touch' },
-  { r: 'records', icon: 'layers', label: 'Records', c: 'var(--peach)', group: 'life', sub: 'Insurance, car, taxes, notes' },
+  { r: 'records', icon: 'layers', label: 'Records', c: 'var(--peach)', group: 'life', sub: 'Car, apartment, insurance, taxes' },
   { r: 'changes', icon: 'history', label: 'Claude’s changes', c: 'var(--violet)', group: 'system', sub: 'See, undo, leave Claude a note' },
   { r: 'settings', icon: 'gear', label: 'Settings', c: 'var(--muted)', group: 'system', sub: 'Preferences and connections' },
   { r: 'help', icon: 'help', label: 'Help', c: 'var(--sky)', group: 'system', sub: 'How things work' },
@@ -199,7 +200,7 @@ export function App() {
     case 'insights': view = <Insights />; break
     case 'more': view = <More />; break
     case 'notes': view = <Notes />; break
-    case 'records': view = <Records />; break
+    case 'records': view = sub ? <AssetPage key={sub} ref_={sub} /> : <Records />; break
     case 'calendar': view = <Calendar mode={sub} />; break
     case 'settings': view = <Settings />; break
     case 'goals': view = <Goals />; break

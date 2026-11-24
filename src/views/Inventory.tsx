@@ -49,7 +49,7 @@ export function Inventories() {
   )
 }
 
-function ListSheet({ list, items, onClose }: { list: string | null; items: Item[]; onClose: () => void }) {
+export function ListSheet({ list, items, onClose }: { list: string | null; items: Item[]; onClose: () => void }) {
   const [q, setQ] = useState('')
   const [edit, setEdit] = useState<Partial<Item> | null>(null)
   const [quick, setQuick] = useState('')
