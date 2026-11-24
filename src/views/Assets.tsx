@@ -115,7 +115,7 @@ export function AssetPage({ ref_ }: { ref_: string }) {
 
       <Card title={a.kind === 'home' ? 'Repairs and upkeep' : 'Maintenance'} icon="wrench" accent={k.c}
         action={<button class="btn ghost sm" onClick={() => setEditLog({ asset_id: a.id, done_on: today(), what: '', miles: null, cost: null, where_done: null, notes: null })}><Icon name="plus" size={16} />Log</button>}>
-        {!log.length && <p class="faint small">Log oil changes, repairs and inspections here{a.kind === 'vehicle' ? ', with the mileage' : ''}.</p>}
+        {!log.length && <p class="faint small">{a.kind === 'vehicle' ? 'Nothing logged yet. Add oil changes, repairs and inspections with the mileage.' : 'Nothing logged yet. Add repairs, maintenance requests and fixes.'}</p>}
         {log.slice(0, allLogs ? 999 : 6).map((l) => (
           <button class="inv-item" onClick={() => setEditLog(l)}>
             <span class="grow" style="min-width:0"><div class="ellipsis">{l.what}</div>
