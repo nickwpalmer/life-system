@@ -117,7 +117,7 @@ export function AssetPage({ ref_ }: { ref_: string }) {
         action={<button class="btn ghost sm" onClick={() => setEditLog({ asset_id: a.id, done_on: today(), what: '', miles: null, cost: null, where_done: null, notes: null })}><Icon name="plus" size={16} />Log</button>}>
         {!log.length && <p class="faint small">Log oil changes, repairs and inspections here{a.kind === 'vehicle' ? ', with the mileage' : ''}.</p>}
         {log.slice(0, allLogs ? 999 : 6).map((l) => (
-          <button class="gi-row gi-main" style="width:100%" onClick={() => setEditLog(l)}>
+          <button class="inv-item" onClick={() => setEditLog(l)}>
             <span class="grow" style="min-width:0"><div class="ellipsis">{l.what}</div>
               <div class="faint tiny ellipsis">{[fmtDay(l.done_on).replace(/^\w+, /, ''), l.miles != null ? `${l.miles.toLocaleString()} mi` : '', l.where_done ?? '', l.notes ?? ''].filter(Boolean).join(' · ')}</div></span>
             {l.cost != null && <span class="faint small">{money(l.cost)}</span>}
