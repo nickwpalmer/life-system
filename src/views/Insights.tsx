@@ -6,6 +6,8 @@ import type { Metric } from '../lib/types'
 import { Icon } from '../ui/icons'
 import { PageHead, Card } from '../ui/kit'
 import { LineChart, BarChart, Heat } from '../ui/charts'
+import { fmtShort } from '../lib/dates'
+import type { Review } from '../lib/types'
 
 const avg = (xs: (number | null)[]) => { const v = xs.filter((x): x is number => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null }
 
@@ -98,6 +100,30 @@ export function Insights() {
           </Card>
         </div>
       </div>
+      <Reviews />
     </>
+  )
+}
+
+/** Every weekly review, newest first, with how the weeks have felt over time. */
+function Reviews() {
+  const reviews = useStore((s) => [...s.reviews].sort((a, b) => b.week_start.localeCompare(a.week_start)))
+  const [open, setOpen] = useState<string | null>(null)
+  if (!reviews.length) return <Card title="Weekly reviews" icon="review" accent="var(--lilac)"><p class="muted small">Your weekly reviews collect here, so you can see how the weeks add up. <a href="#/review">Do last week’s</a>.</p></Card>
+  const asc = [...reviews].reverse().slice(-12)
+  return (
+    <Card title="Weekly reviews" icon="review" accent="var(--lilac)" action={<a class="link" href="#/review">This week’s</a>}>
+      {asc.length > 1 && <><BarChart days={asc.map((r) => r.week_start)} values={asc.map((r) => r.rating)} color="#cdb9ff" target={7} /><p class="faint tiny" style="margin:4px 0 10px">How each week felt, out of 10.</p></>}
+      {reviews.slice(0, 12).map((r: Review) => (
+        <div class="faq">
+          <button class="row between" onClick={() => setOpen(open === r.id ? null : r.id)}><span>Week of {fmtShort(r.week_start)}</span><span class="faint small">{r.rating ? `${r.rating}/10` : ''}</span></button>
+          {open === r.id && <div class="small" style="padding:0 2px 12px;line-height:1.5">
+            {r.focus?.length > 0 && <p><b>Focus:</b> {r.focus.join(', ')}</p>}
+            {r.wins && <p style="margin-top:4px"><b>Went well:</b> {r.wins}</p>}
+            {r.lessons && <p style="margin-top:4px"><b>Change:</b> {r.lessons}</p>}
+          </div>}
+        </div>
+      ))}
+    </Card>
   )
 }

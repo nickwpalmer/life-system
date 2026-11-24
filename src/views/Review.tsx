@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks'
-import { useStore, toast, getState } from '../lib/store'
+import { useStore, toast } from '../lib/store'
 import { insert, update } from '../lib/db'
 import { weekStart, dayKey, addDays, fromKey, fmtShort, fmtDay, today } from '../lib/dates'
 import { dailySeries, consistency, fmtValue } from '../lib/metrics'
@@ -11,21 +11,36 @@ import { TaskRow, TaskSheet, openTask } from './Tasks'
 import { goalProgress } from './Goals'
 import { CompassCard } from './Compass'
 
-/** Which week to review: Fri to Sun is this week; Mon to Thu is last week unless it's done. */
-function targetWeek(reviews: Review[]) {
-  const d = new Date().getDay()
-  const thisWs = dayKey(weekStart())
-  const lastWs = dayKey(addDays(weekStart(), -7))
-  if (d === 0 || d >= 5) return thisWs
-  return reviews.some((r) => r.week_start === lastWs) ? thisWs : lastWs
+/** Which week to review: on Sunday the week that's ending; any other day, last week. */
+function targetWeek() {
+  return new Date().getDay() === 0 ? dayKey(weekStart()) : dayKey(addDays(weekStart(), -7))
+}
+
+/** A finished review, read-only. */
+export function ReviewSummary({ r, onEdit }: { r: Review; onEdit?: () => void }) {
+  const d = (r.data ?? {}) as Record<string, number | null>
+  return (
+    <>
+      <div class="stats3">
+        <div><b>{r.rating ?? '–'}<span class="faint small">/10</span></b><span>the week</span></div>
+        <div><b>{d.tasks_done ?? '–'}</b><span>tasks done</span></div>
+        <div><b>{d.mood_avg != null ? Number(d.mood_avg).toFixed(1) : '–'}</b><span>avg mood</span></div>
+      </div>
+      {r.focus?.length > 0 && <Card title="Focus for the next week" icon="compass" accent="var(--lilac)">{r.focus.map((x, i) => <div class="row" style="padding:5px 0"><span class="pill quiet">{i + 1}</span>{x}</div>)}</Card>}
+      {r.wins && <Card title="What went well" icon="sparkle" accent="var(--gold)"><p style="white-space:pre-wrap">{r.wins}</p></Card>}
+      {r.lessons && <Card title="What you’ll change" icon="bolt" accent="var(--coral)"><p style="white-space:pre-wrap">{r.lessons}</p></Card>}
+      {onEdit && <div class="row" style="margin:4px 0 16px"><button class="btn grow" onClick={onEdit}><Icon name="edit" size={17} />Edit this review</button><a class="btn grow" href="#/insights">All reviews in Insights</a></div>}
+    </>
+  )
 }
 
 const avg = (xs: (number | null)[]) => { const v = xs.filter((x): x is number => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null }
 
 export function WeeklyReview() {
   const reviews = useStore((s) => s.reviews)
-  const [ws] = useState(() => targetWeek(getState().reviews))
+  const [ws] = useState(() => targetWeek())
   const existing = reviews.find((r) => r.week_start === ws)
+  const [editing, setEditing] = useState(false)
   const [step, setStep] = useState(0)
   const [f, setF] = useState(() => ({ wins: existing?.wins ?? '', lessons: existing?.lessons ?? '', focus: existing?.focus ?? [], rating: existing?.rating ?? null as number | null }))
   const [edit, setEdit] = useState<Task | null>(null)
@@ -60,9 +75,16 @@ export function WeeklyReview() {
       if (existing) await update('reviews', existing.id, row)
       else await insert('reviews', { ...row, week_start: ws })
       burst(btn, 26); toast('Week reviewed. Nice work.')
-      setTimeout(() => { location.hash = '#/today' }, 700)
+      setEditing(false); window.scrollTo({ top: 0 })
     } catch { /* shown */ }
   }
+
+  if (existing && !editing) return (
+    <>
+      <PageHead title="Weekly review" sub={`${fmtShort(ws)} to ${fmtShort(end)} · done`} icon="review" color="var(--lilac)" />
+      <ReviewSummary r={existing} onEdit={() => { setF({ wins: existing.wins ?? '', lessons: existing.lessons ?? '', focus: existing.focus ?? [], rating: existing.rating ?? null }); setEditing(true) }} />
+    </>
+  )
 
   const steps = ['Look back', 'Get clear', 'Goals', 'Look ahead']
   const nav = (
@@ -144,13 +166,6 @@ export function WeeklyReview() {
       </div>}
       {nav}
 
-      {reviews.filter((r) => r.week_start !== ws).length > 0 && step === 0 && (
-        <Card title="Past reviews" icon="review" class="flat">
-          {[...reviews].filter((r) => r.week_start !== ws).sort((a, b) => b.week_start.localeCompare(a.week_start)).slice(0, 6).map((r) => (
-            <div class="entry" style="cursor:default"><div class="e-title">Week of {fmtShort(r.week_start)}{r.rating ? ` · ${r.rating}/10` : ''}</div>{r.focus?.length > 0 && <div class="e-body">Focus: {r.focus.join(', ')}</div>}{r.wins && <div class="e-body">{r.wins}</div>}</div>
-          ))}
-        </Card>
-      )}
       <TaskSheet task={edit} onClose={() => setEdit(null)} />
     </>
   )

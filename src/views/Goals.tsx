@@ -41,6 +41,7 @@ function Editor({ goal, onClose }: { goal: Goal | 'new' | null; onClose: () => v
       <div class="field"><span>Area</span><div class="chips">{areas.map((a) => <button class={`chip ${f.area_id === a.id ? 'on' : ''}`} style={`--c:${a.color}`} onClick={() => setF({ ...f, area_id: f.area_id === a.id ? null : a.id })}><i class="dot" style={`background:${a.color}`} />{a.name}</button>)}</div></div>
       <div class="field"><span>Horizon</span><div class="chips">{HORIZONS.map(([k, l]) => <button class={`chip ${f.horizon === k ? 'on' : ''}`} onClick={() => setF({ ...f, horizon: k })}>{l}</button>)}</div></div>
       <label class="field"><span>Target date (optional)</span><input class="input" type="date" value={f.target_date ?? ''} onInput={(e) => setF({ ...f, target_date: (e.target as HTMLInputElement).value || null })} /></label>
+      {goal !== 'new' && <Steps goal={goal as Goal} />}
       {!tasks.length && <div class="field"><span>Progress</span><div class="chips">{[0, 25, 50, 75, 100].map((p) => <button class={`chip ${f.progress === p ? 'on' : ''}`} onClick={() => setF({ ...f, progress: p })}>{p}%</button>)}</div><p class="faint tiny" style="margin:6px 4px 0">Or link tasks to this goal and progress fills in by itself.</p></div>}
       <button class="btn primary block" onClick={save}>Save</button>
       {goal !== 'new' && <>
@@ -51,6 +52,20 @@ function Editor({ goal, onClose }: { goal: Goal | 'new' | null; onClose: () => v
         <button class="btn ghost danger block" style="margin-top:8px" onClick={del}><Icon name="trash" size={18} /> Delete</button>
       </>}
     </Sheet>
+  )
+}
+
+/** A goal's steps: tasks linked to it. Adding one here puts it in Tasks too. */
+function Steps({ goal }: { goal: Goal }) {
+  const all = useStore((s) => s.tasks)
+  const steps = all.filter((t) => t.goal_id === goal.id && t.status !== 'dropped').sort((a, b) => Number(a.status === 'done') - Number(b.status === 'done'))
+  const [text, setText] = useState('')
+  const add = () => { const t = text.trim(); if (!t) return; setText(''); addTask({ title: t, goal_id: goal.id, area_id: goal.area_id, status: 'open' }).catch(() => {}) }
+  return (
+    <div class="field"><span>Steps (the project)</span>
+      {steps.map((t) => <div class="row" style={`padding:6px 2px;${t.status === 'done' ? 'opacity:.5;text-decoration:line-through' : ''}`}><Icon name={t.status === 'done' ? 'check' : 'arrow'} size={15} />{t.title}</div>)}
+      <div class="row" style="margin-top:6px"><input class="input grow" placeholder="Add a step" value={text} onInput={(e) => setText((e.target as HTMLInputElement).value)} onKeyDown={(e) => e.key === 'Enter' && add()} /><button class="btn" onClick={add}>Add</button></div>
+    </div>
   )
 }
 
@@ -120,7 +135,8 @@ export function Goals() {
           {paused.length > 0 && <Card title="Paused">{paused.map((g) => <GoalRow g={g} onOpen={() => setEdit(g)} />)}</Card>}
           {done.length > 0 && <Card title="Achieved" icon="check" accent="var(--mint)">{done.map((g) => <div class="row" style="padding:7px 0"><Icon name="check" size={16} /><span class="grow">{g.title}</span></div>)}</Card>}
           <Card title="How to use this" icon="compass">
-            <p class="muted small" style="line-height:1.55">Write why each goal matters, then keep one small next step on it. Link tasks to a goal and its ring fills as you finish them. The weekly review walks through each goal so nothing quietly stalls.</p>
+            <p class="muted small" style="line-height:1.55"><b>A goal</b> is an outcome you want, like “Finish the semester with a 3.5”. <b>A project</b> is the set of steps that gets you there, like “Final exam study plan”. Here, a goal’s steps are its project: add them in the goal, they show up in Tasks, and the ring fills as you finish them.</p>
+            <p class="muted small" style="line-height:1.55;margin-top:8px">Claude adds proposed goals as it learns what you’re working toward. They wait at the top until you keep or drop them.</p>
           </Card>
         </div>
       </div>
