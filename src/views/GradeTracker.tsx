@@ -46,9 +46,10 @@ export function catStanding(c: Cat, items: Item[]) {
 }
 
 export function computeGrade(cats: Cat[], items: Item[]) {
-  let s = 0, w = 0
-  const rows = cats.map((c) => { const st = catStanding(c, items); if (c.weight && st.pct != null) { s += c.weight * st.pct; w += c.weight } return { c, ...st } })
-  return { pct: w ? s / w : null, rows, weighted: w, unweighted: cats.filter((c) => c.weight == null).map((c) => c.cat) }
+  let s = 0, w = 0, scored = 0
+  const rows = cats.map((c) => { const st = catStanding(c, items); if (c.weight && st.pct != null) { s += c.weight * st.pct; w += c.weight; if (c.rule !== 'complete') scored += c.weight } return { c, ...st } })
+  // A completion category alone (homework done or not) says little about the grade, so wait for real scores.
+  return { pct: w && scored ? s / w : null, rows, weighted: scored ? w : 0, unweighted: cats.filter((c) => c.weight == null).map((c) => c.cat) }
 }
 
 /** What the final needs for each letter, if everything else stays where it is. */
@@ -101,7 +102,7 @@ export function GradeTracker({ course, color }: { course: CourseLike; color: str
   return (
     <Card title="Grade tracker" icon="target" accent={color} action={<button class="faint small" onClick={() => setWeights(true)}>Weights</button>}>
       <div class="row between" style="margin-bottom:6px">
-        <span><b style={`font-size:28px;color:${color}`}>{letter ?? '–'}</b> <span class="muted">{g.pct != null ? `${fmt(g.pct)}%` : 'no scores yet'}</span></span>
+        <span><b style={`font-size:28px;color:${color}`}>{letter ?? '–'}</b> <span class="muted">{g.pct != null ? `${fmt(g.pct)}%` : 'add scores and weights to see your grade'}</span></span>
         <span class="faint small">{g.weighted ? `from ${g.weighted}% of the grade` : ''}</span>
       </div>
       <div class="gcats">{g.rows.map((r) => (
