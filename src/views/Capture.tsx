@@ -34,7 +34,7 @@ export function Capture() {
           const q = parseQuick(line, getState().areas)
           await addTask({ title: q.title || line, due_date: q.due_date, due_time: q.due_time, priority: q.priority, area_id: q.area_id, status: q.due_date || q.area_id ? 'open' : 'inbox' })
         }
-        toast(lines.length > 1 ? `${lines.length} tasks captured` : filed ? `Added${p.due_date ? ` for ${fmtDay(p.due_date).toLowerCase()}` : ''}` : 'In your inbox')
+        toast(lines.length > 1 ? `${lines.length} tasks captured` : filed ? `Added${p.due_date ? ` for ${/^(Today|Tomorrow)$/.test(fmtDay(p.due_date)) ? fmtDay(p.due_date).toLowerCase() : fmtDay(p.due_date)}` : ''}` : 'In your inbox')
       } else if (mode === 'journal') {
         await insert('journal_entries', { body: t, title: null, mood: null, area_id: null, tags: [], occurred_at: new Date().toISOString() })
         toast('Saved to journal')
@@ -65,7 +65,7 @@ export function Capture() {
         {mode !== 'task' ? (mode === 'journal' ? 'Saves with today’s date and time.' : 'Shows up under Reference.')
           : !text.trim() ? 'Don’t sort it now. It goes to your inbox and you can file it later.'
             : <>{p.due_date ? <><b>{fmtDay(p.due_date)}</b>{p.due_time ? <> at <b>{fmtClock(p.due_time)}</b></> : null} · </> : null}
-              {area ? <><b>{area.name}</b> · </> : null}{p.priority ? <><b>{'!'.repeat(p.priority)}</b> · </> : null}{filed ? 'filed' : 'to inbox'}</>}
+              {area ? <><b>{area.name}</b> · </> : null}{p.priority ? <><b>{p.priority === 3 ? 'high' : 'medium'} priority</b> · </> : null}{filed ? 'filed' : 'to inbox'}</>}
       </p>
       <div class="row" style="margin-top:12px">
         <button class="btn primary grow" disabled={!text.trim()} onClick={() => save()}>Save</button>

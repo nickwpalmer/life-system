@@ -119,7 +119,7 @@ export function AddTask({ defaults, placeholder = 'Add a task… try “essay fr
         <input class="input" placeholder={placeholder} value={v} onInput={(e) => setV((e.target as HTMLInputElement).value)} />
         <button class="icon-btn" style="width:48px;height:48px;background:var(--grad);color:#1d1330;border:0" aria-label="Add task"><Icon name="plus" stroke={2.6} /></button>
       </div>
-      <p class="hint">{v.trim() && (p.due_date || a || p.priority) ? <>{p.due_date && <><b>{fmtDay(p.due_date)}</b>{p.due_time ? <> {fmtClock(p.due_time)}</> : null} </>}{a && <><b>{a.name}</b> </>}{p.priority ? <b>{'!'.repeat(p.priority)}</b> : null}</> : ''}</p>
+      <p class="hint">{v.trim() && (p.due_date || a || p.priority) ? <>{p.due_date && <><b>{fmtDay(p.due_date)}</b>{p.due_time ? <> {fmtClock(p.due_time)}</> : null} </>}{a && <><b>{a.name}</b> </>}{p.priority ? <b>{p.priority === 3 ? 'high' : 'medium'} priority</b> : null}</> : ''}</p>
     </form>
   )
 }

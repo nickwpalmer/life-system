@@ -93,7 +93,7 @@ export function Insights() {
           <Card title="Habits" icon="flame" accent="var(--violet)">{habits.length ? habits.map(habitLine) : <p class="muted small">No habits set up.</p>}</Card>
           <Card title="Vices" icon="pulse" accent="var(--coral)">
             {vices.map((m) => { const s = dailySeries(m, logs, days); const a = avg(s); const free = s.filter((v) => !v).length; return (
-              <div class="metric-row"><div class="row between small" style="margin-bottom:8px"><span>{m.name}</span><span class="faint">{free} free days{a != null ? ` · avg ${fmtValue(m, a)}` : ''}</span></div><Heat values={s.slice(-28)} color="#ff8a7a" /></div>
+              <div class="metric-row"><div class="row between small" style="margin-bottom:8px"><span>{m.name}</span><span class="faint">{free} free day{free === 1 ? "" : "s"}{a != null ? ` · avg ${fmtValue(m, a)}` : ''}</span></div><Heat values={s.slice(-28)} color="#ff8a7a" /></div>
             ) })}
           </Card>
         </div>

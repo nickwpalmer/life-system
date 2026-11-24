@@ -40,7 +40,8 @@ export function WeeklyReview() {
   const m = (k: string) => metrics.find((x) => x.key === k)
   const mood = m('mood') ? avg(dailySeries(m('mood')!, logs, days)) : null
   const sleep = m('sleep_hours') ? avg(dailySeries(m('sleep_hours')!, logs, days)) : null
-  const habits = metrics.filter((x) => x.active && x.role === 'habit').map((x) => ({ x, c: consistency(dailySeries(x, logs, days)) }))
+  const elapsed = days.filter((d) => d <= today())
+  const habits = metrics.filter((x) => x.active && x.role === 'habit').map((x) => ({ x, c: consistency(dailySeries(x, logs, elapsed)) }))
   const nightWins = checkins.filter((c) => days.includes(c.day) && c.win).map((c) => c.win!)
 
   const inbox = tasks.filter((t) => t.status === 'inbox')
@@ -64,7 +65,7 @@ export function WeeklyReview() {
 
   const steps = ['Look back', 'Get clear', 'Goals', 'Look ahead']
   const nav = (
-    <div class="row" style="margin-top:16px">
+    <div class="row" style="margin:16px 0 18px">
       {step > 0 && <button class="btn" onClick={() => setStep(step - 1)}><Icon name="back" size={18} />Back</button>}
       {step < 3 ? <button class="btn primary grow" onClick={() => { setStep(step + 1); window.scrollTo({ top: 0 }) }}>Next: {steps[step + 1]}</button>
         : <button class="btn primary grow" onClick={save}>{existing ? 'Update review' : 'Finish review'}</button>}
@@ -80,14 +81,14 @@ export function WeeklyReview() {
       {step === 0 && <>
         <div class="stat-row four">
           <div class="stat" style="--c:var(--violet)"><div class="s-val">{doneN}</div><div class="s-lbl">tasks done</div></div>
-          <div class="stat" style="--c:var(--orange)"><div class="s-val">{ciN}<span class="faint small">/14</span></div><div class="s-lbl">check-ins</div></div>
+          <div class="stat" style="--c:var(--orange)"><div class="s-val">{ciN}<span class="faint small">/{elapsed.length * 2}</span></div><div class="s-lbl">check-ins</div></div>
           <div class="stat" style="--c:var(--pink)"><div class="s-val">{mood != null ? mood.toFixed(1) : '–'}</div><div class="s-lbl">avg mood</div></div>
           <div class="stat desk-only" style="--c:var(--sky)"><div class="s-val">{sleep != null ? sleep.toFixed(1) : '–'}</div><div class="s-lbl">avg sleep (h)</div></div>
         </div>
         <div class="grid-2">
           <Card title="Habits this week" icon="flame" accent="var(--violet)">
             {habits.length ? habits.map(({ x, c }) => (
-              <div style="padding:7px 0"><div class="row between small"><span>{x.name}</span><span class="faint">{c.hit}/7 days</span></div><div class="progress" style="margin-top:6px"><i style={`width:${c.pct * 100}%`} /></div></div>
+              <div style="padding:7px 0"><div class="row between small"><span>{x.name}</span><span class="faint">{c.hit}/{c.n} days</span></div><div class="progress" style="margin-top:6px"><i style={`width:${c.pct * 100}%`} /></div></div>
             )) : <p class="muted small">No habits set up.</p>}
             {sleep == null ? null : <p class="faint small" style="margin-top:8px">Average sleep {fmtValue(m('sleep_hours')!, sleep)}. {jN} journal entr{jN === 1 ? 'y' : 'ies'}.</p>}
           </Card>

@@ -76,7 +76,7 @@ function Sidebar({ base }: { base: string }) {
       ))}
       <div style="height:10px" />
       {NAV.filter((n) => n.group === 'system').map(a)}
-      <div class="s-foot">Press N to capture · 1–5 to switch</div>
+      <div class="s-foot">Press N to capture · 1–7 to switch</div>
     </aside>
   )
 }

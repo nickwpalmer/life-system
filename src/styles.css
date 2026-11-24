@@ -411,3 +411,7 @@ textarea.input.tall { min-height: 260px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { animation-duration: 0.01ms !important; animation-iteration-count: 1 !important; transition-duration: 0.01ms !important; }
 }
+a.btn { text-decoration: none; color: inherit; }
+a.btn.primary { color: #1d1330; }
+.hint:empty { min-height: 0; margin: 0; }
+@media (min-width: 960px) { .app { margin-left: calc(var(--side) + max(0px, (100vw - var(--side) - 1120px) / 2)); } }
