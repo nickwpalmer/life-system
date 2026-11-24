@@ -2,7 +2,7 @@ import { useEffect, useState } from 'preact/hooks'
 import { useRows, addRow, patchRow, dropRow, registerDemo } from '../lib/rows'
 import { toast } from '../lib/store'
 import { daysUntil, fmtShort, fromKey, inDays } from '../lib/dates'
-import { usePrefs } from '../lib/prefs'
+import { usePrefs, savePrefs } from '../lib/prefs'
 import { Icon } from '../ui/icons'
 import { Sheet, PageHead, Switch, haptic } from '../ui/kit'
 
@@ -146,7 +146,7 @@ function Preview() {
   const base: Rec = { id: 'p', name: 'Health insurance', category: 'insurance', issuer: 'Your insurer', details: 'Plan and member number go here.', location: 'Card in wallet', link: null, login_hint: null, expires_on: null, renews: false, notes: null, pinned: false }
   return (
     <section class="card preview-box">
-      <div class="card-h"><h2>Expiry preview</h2><a class="btn ghost sm" href="#/settings">Turn off</a></div>
+      <div class="card-h"><h2>Expiry preview</h2><button class="btn ghost sm" onClick={() => savePrefs({ previewExpiry: false })}>Turn off</button></div>
       <p class="faint small" style="margin-bottom:12px">Sample only, not your data. This is how a record looks as its date gets close and after it passes.</p>
       <div class="rec-grid">
         <RecCard r={{ ...base, id: 'p1', expires_on: inDays(120) }} preview="Active" />
