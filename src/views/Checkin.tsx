@@ -7,6 +7,7 @@ import type { Checkin, Task } from '../lib/types'
 import { ScalePicker, ListInputs, burst, PageHead, Card } from '../ui/kit'
 import { LogGroups } from './DailyLog'
 import { openTask } from './Tasks'
+import { useCompass } from './Compass'
 
 const blank = (kind: 'morning' | 'night', day: string): Checkin => ({
   kind, day, mood: null, energy: null, stress: null, focus: null, sleep_quality: null,
@@ -18,6 +19,7 @@ export function CheckinView({ kind }: { kind: 'morning' | 'night' }) {
   const existing = getState().checkins.find((c) => c.kind === kind && c.day === day)
   const [c, setC] = useState<Checkin>(() => existing ? { ...blank(kind, day), ...existing } : blank(kind, day))
   const [busy, setBusy] = useState(false)
+  const compass = useCompass()
   const sleepM = metricByKey('sleep_hours')
   const [sleep, setSleep] = useState<string>(() => { const v = sleepM ? dailySeries(sleepM, getState().logs, [day])[0] : null; return v == null ? '' : String(v) })
   const set = (p: Partial<Checkin>) => setC({ ...c, ...p })
@@ -67,6 +69,7 @@ export function CheckinView({ kind }: { kind: 'morning' | 'night' }) {
                 {scale('Mood right now', 'mood')}
                 {scale('Energy', 'energy', 'Drained', 'Charged', 'cool')}
                 {text('One intention for today', 'intention', 'Today I want to…')}
+                {compass.mission && <p class="faint tiny" style="margin:-6px 0 12px">Pointing at: {compass.mission}</p>}
                 <div class="ci-section"><span class="ci-label">Top three</span>
                   <ListInputs values={c.top_three} onChange={(v) => set({ top_three: v })} placeholder="Priority" />
                   {ideas.length > 0 && <div class="chips" style="margin-top:4px">{ideas.filter((t) => !c.top_three.includes(t.title)).slice(0, 4).map((t) => <button type="button" class="chip" style="height:30px;font-size:13px" onClick={() => { const v = [...c.top_three]; const i = [0, 1, 2].find((n) => !v[n]); if (i != null) { v[i] = t.title; set({ top_three: v }) } }}>+ {t.title.length > 34 ? t.title.slice(0, 32) + '…' : t.title}</button>)}</div>}
