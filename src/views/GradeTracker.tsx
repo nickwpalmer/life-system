@@ -128,7 +128,7 @@ export function GradeTracker({ course, color }: { course: CourseLike; color: str
           {groups.length > 0 && <><div class="faint tiny" style="margin:10px 0 4px">Your guesses for what’s not graded yet</div>
             {groups.map((gr) => { const i = gr.list[0]; const avg = gr.list.reduce((a, x) => a + (x.guess ?? 0), 0) / gr.list.length; return (
               <div class="row small" style="gap:8px;margin-bottom:6px"><span class="grow ellipsis">{gr.name}</span>
-                <input class="input" style="width:72px;padding:4px 8px" type="number" inputMode="decimal" value={fmt(avg)} onChange={(e) => setGuess(gr.list, (e.target as HTMLInputElement).value)} />
+                <input class="input" style="width:72px;flex:none;padding:4px 8px" type="number" inputMode="decimal" value={fmt(avg)} onChange={(e) => setGuess(gr.list, (e.target as HTMLInputElement).value)} />
                 <span class="faint tiny" style="width:34px">{outOf(i)}</span></div>) })}</>}
           <div class="faint tiny" style="margin-top:6px">Exams use your guesses in all three. Keep up means everything due from today on gets done and nothing old is redone.</div>
         </div> : <div class="faint tiny" style="margin-top:4px">Tap one for the breakdown and to change your guesses.</div>}
