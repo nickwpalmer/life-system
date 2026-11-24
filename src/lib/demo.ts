@@ -61,11 +61,12 @@ export function demoData(): Data {
   ])
   const ev = (d: string, h: number, title: string, cal: string, dur = 1): CalEvent => { const s = new Date(d + 'T00:00:00'); s.setHours(h); return { id: id(), title, starts_at: s.toISOString(), ends_at: new Date(s.getTime() + dur * 3600e3).toISOString(), all_day: false, location: null, calendar_name: cal } }
   const events: CalEvent[] = []
-  for (let i = -3; i < 10; i++) {
+  for (let i = -24; i < 30; i++) {
     const d = dayKey(addDays(new Date(), i)); const wd = addDays(new Date(), i).getDay()
     if (wd >= 1 && wd <= 5) { events.push(ev(d, 9, 'SEM 100 lecture', 'School', 1.25)); if (wd % 2) events.push(ev(d, 13, 'MATH 101', 'School')) }
-    if (wd === 6) events.push(ev(d, 10, 'Prime IV shift', 'Work', 6))
+    if (wd === 6) events.push(ev(d, 10, 'Shift', 'Work', 6))
     if (wd === 3) events.push(ev(d, 19, 'Dinner with Sam', 'Personal', 2))
+    if (wd === 2 || wd === 4) events.push({ ...ev(d, 0, wd === 4 && i % 3 === 0 ? 'Quiz 4 [MATH_101]' : 'HW set [MATH_101]', 'Canvas'), all_day: true, starts_at: `${d}T00:00:00Z`, ends_at: null })
   }
   return {
     profile: { id: 'demo', display_name: 'Jordan', timezone: 'America/Detroit', settings: {} },

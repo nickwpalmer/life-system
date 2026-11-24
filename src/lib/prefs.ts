@@ -12,7 +12,10 @@ export type Prefs = {
   /** Calendar layers shown by default. */
   cal: { personal: boolean; work: boolean; classes: boolean; assignments: boolean; important: boolean }
   sleepDefault: number
+  /** What each Google calendar is, by its name. Unlisted calendars are guessed from the name. */
+  calRoles: Record<string, CalRole>
 }
+export type CalRole = 'personal' | 'work' | 'classes' | 'assignments' | 'important'
 export type LogoKey = 'classic' | 'sunset' | 'night' | 'mono' | 'glass'
 
 export const DEFAULT_PREFS: Prefs = {
@@ -22,12 +25,14 @@ export const DEFAULT_PREFS: Prefs = {
   logo: 'classic',
   cal: { personal: true, work: true, classes: true, assignments: false, important: true },
   sleepDefault: 7,
+  calRoles: {},
 }
 
 const merge = (p: Partial<Prefs> | undefined): Prefs => ({
   ...DEFAULT_PREFS, ...p,
   windows: { ...DEFAULT_PREFS.windows, ...p?.windows },
   cal: { ...DEFAULT_PREFS.cal, ...p?.cal },
+  calRoles: { ...p?.calRoles },
   tabs: p?.tabs?.length === 3 ? p.tabs : DEFAULT_PREFS.tabs,
 })
 
@@ -68,4 +73,15 @@ export const logoUrl = (k: LogoKey, size: 180 | 512 = 180) => `${import.meta.env
 /** iPhone reads the touch icon when you add the app to the Home Screen, so swap it ahead of time. */
 export function applyLogo(k: LogoKey) {
   document.querySelectorAll('link[rel=apple-touch-icon]').forEach((l) => l.setAttribute('href', logoUrl(k)))
+}
+
+/** Which layer a calendar belongs to: your choice first, then a guess from its name. */
+export function calRole(p: Prefs, name: string | null): CalRole {
+  const n = name ?? ''
+  if (p.calRoles[n]) return p.calRoles[n]
+  if (/canvas|assignment|homework/i.test(n)) return 'assignments'
+  if (/class|school|course|lecture/i.test(n)) return 'classes'
+  if (/work|shift|job/i.test(n)) return 'work'
+  if (/claude|important|deadline/i.test(n)) return 'important'
+  return 'personal'
 }

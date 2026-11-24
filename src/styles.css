@@ -602,3 +602,24 @@ button.tile { text-align: left; font: inherit; cursor: pointer; }
 .faq:last-child { border-bottom: 0; }
 .faq > button { width: 100%; padding: 13px 2px; text-align: left; gap: 10px; font-size: 15px; }
 .faq p { padding: 0 2px 14px; line-height: 1.55; animation: enter 0.2s var(--ease); }
+
+/* Calendar v0.3 */
+.seg a { flex: 1; display: grid; place-items: center; height: 36px; border-radius: 10px; color: var(--muted); font-size: 13.5px; text-decoration: none; transition: background 0.2s, color 0.2s; white-space: nowrap; }
+.seg a.on { background: var(--surface); color: var(--text); box-shadow: 0 2px 10px -4px rgba(0, 0, 0, 0.4); }
+.month { padding: 12px 10px; }
+.mgrid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.mcell { display: flex; flex-direction: column; align-items: stretch; gap: 2px; min-height: 64px; padding: 4px 3px; border-radius: 10px; background: var(--surface-2); text-align: left; min-width: 0; overflow: hidden; border: 1px solid transparent; }
+.mcell.out { opacity: 0.35; }
+.mcell.today { border-color: color-mix(in srgb, var(--orange) 60%, transparent); }
+.mcell.on { border-color: var(--lilac); background: color-mix(in srgb, var(--violet) 18%, var(--surface-2)); }
+.mcell .mn { font-size: 12.5px; font-weight: 650; padding-left: 2px; }
+.mcell .mev { display: flex; flex-direction: column; gap: 2px; }
+.mcell .mev i { display: block; font-style: normal; font-size: 9.5px; line-height: 1.25; padding: 1px 3px; border-radius: 4px; background: color-mix(in srgb, var(--c) 22%, transparent); color: var(--text); }
+.mcell .pips { display: flex; gap: 2px; margin-top: auto; padding-left: 2px; }
+.mcell .pips i { width: 5px; height: 5px; border-radius: 50%; background: var(--c); }
+@media (min-width: 900px) { .mcell { min-height: 92px; } .mcell .mev i { font-size: 11px; } }
+.freerow { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.freerow:last-of-type { border-bottom: 0; }
+.freebar { display: flex; height: 10px; border-radius: 999px; overflow: hidden; margin: 8px 0; background: var(--surface-2); }
+.freebar i { display: block; height: 100%; transition: width 0.3s var(--ease); }
+.range { accent-color: var(--violet); height: 24px; }

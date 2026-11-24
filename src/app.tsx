@@ -178,7 +178,7 @@ export function App() {
     case 'insights': view = <Insights />; break
     case 'more': view = <More />; break
     case 'notes': view = <Notes />; break
-    case 'calendar': view = <Calendar />; break
+    case 'calendar': view = <Calendar mode={sub} />; break
     case 'settings': view = <Settings />; break
     case 'goals': view = <Goals />; break
     case 'review': view = <WeeklyReview />; break
