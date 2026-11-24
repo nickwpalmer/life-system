@@ -32,7 +32,7 @@ export function loadRows(t: RowTable, force = false) {
     if (getState().demo) { set(t, demoRows.get(t)?.() ?? []); return }
     const [col, asc] = ORDER[t]
     let q = supabase.from(t).select((t === 'ring_days' ? 'id,day,vals,fetched_at' : '*') as '*').order(col, { ascending: asc, nullsFirst: false })
-    if (t === 'change_log') q = q.limit(200)
+    if (t === 'change_log') q = q.limit(600)
     if (t === 'claude_inbox') q = q.limit(100)
     if (t === 'substance_logs') q = q.limit(2000)
     if (t === 'ring_days') q = q.limit(120) // raw API answers stay in the database
