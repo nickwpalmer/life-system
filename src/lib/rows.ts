@@ -6,7 +6,7 @@ import { getState, toast } from './store'
  * Tables that aren't in the one-shot bootstrap load on the screens that need them.
  * One shared cache per table, so every screen sees the same rows and writes update everywhere at once.
  */
-export type RowTable = 'substance_logs' | 'courses' | 'degree_reqs' | 'scholarships' | 'change_log' | 'key_dates' | 'edu_schools' | 'edu_courses'
+export type RowTable = 'substance_logs' | 'courses' | 'degree_reqs' | 'scholarships' | 'change_log' | 'key_dates' | 'edu_schools' | 'edu_courses' | 'records'
 type Row = { id: string | number } & Record<string, unknown>
 const cache = new Map<RowTable, Row[]>()
 const loading = new Map<RowTable, Promise<void>>()
@@ -15,7 +15,7 @@ const demoRows = new Map<RowTable, () => Row[]>()
 const ORDER: Record<RowTable, [string, boolean]> = {
   substance_logs: ['occurred_at', false], courses: ['sort', true], degree_reqs: ['sort', true],
   scholarships: ['deadline', true], change_log: ['at', false], key_dates: ['day', true],
-  edu_schools: ['sort', true], edu_courses: ['term_order', true],
+  edu_schools: ['sort', true], edu_courses: ['term_order', true], records: ['name', true],
 }
 
 export function registerDemo(t: RowTable, f: () => Row[]) { demoRows.set(t, f) }

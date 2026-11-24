@@ -54,7 +54,7 @@ export function Capture() {
   return (
     <Sheet open={!!open} onClose={close} title="Capture">
       <div class="chips" style="margin-bottom:12px">
-        {([['task', 'Task', 'tasks', 'var(--violet)'], ['mood', 'Mood', 'heart', 'var(--pink)'], ['journal', 'Journal', 'book', 'var(--mint)'], ['note', 'Reference', 'note', 'var(--peach)']] as const).map(([m, l, ic, c]) => (
+        {([['task', 'Task', 'tasks', 'var(--violet)'], ['mood', 'Mood', 'heart', 'var(--pink)'], ['journal', 'Journal', 'book', 'var(--mint)'], ['note', 'Note', 'note', 'var(--peach)']] as const).map(([m, l, ic, c]) => (
           <button class={`chip ${mode === m ? 'on' : ''}`} style={`--c:${c}`} onClick={() => setMode(m)}><Icon name={ic} size={16} />{l}</button>
         ))}
         <button class="chip" style="--c:var(--orange)" onClick={() => setState({ capture: false, substance: true })}><Icon name="flask" size={16} />Substance</button>
@@ -65,7 +65,7 @@ export function Capture() {
         value={text} onInput={(e) => setText((e.target as HTMLTextAreaElement).value)}
         onKeyDown={(e) => { if (e.key === 'Enter' && (mode === 'task' ? !e.shiftKey : e.metaKey || e.ctrlKey)) { e.preventDefault(); save(e.altKey) } }} />
       <p class="hint">
-        {mode !== 'task' ? (mode === 'journal' ? 'Saves with today’s date and time.' : 'Shows up under Reference.')
+        {mode !== 'task' ? (mode === 'journal' ? 'Saves with today’s date and time.' : 'Shows up in Notes, under Records.')
           : !text.trim() ? 'Don’t sort it now. It goes to your inbox and you can file it later.'
             : <>{p.due_date ? <><b>{fmtDay(p.due_date)}</b>{p.due_time ? <> at <b>{fmtClock(p.due_time)}</b></> : null} · </> : null}
               {area ? <><b>{area.name}</b> · </> : null}{p.priority ? <><b>{p.priority === 3 ? 'high' : 'medium'} priority</b> · </> : null}{filed ? 'filed' : 'to inbox'}</>}

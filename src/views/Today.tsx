@@ -1,6 +1,6 @@
 import { useState } from 'preact/hooks'
 import { useStore, setState, metricByKey, toast } from '../lib/store'
-import { today, fmtLongDate, partOfDay, fmtTime, daysUntil, daysBetween, fmtDay, weekStart, dayKey, relTime, fromKey } from '../lib/dates'
+import { today, fmtLongDate, partOfDay, fmtTime, daysUntil, daysBetween, fmtDay, weekStart, dayKey, relTime, fromKey, fmtShort } from '../lib/dates'
 import { eventDay, calColor, nextBirthday } from '../lib/cal'
 import { addTimedLog } from '../lib/db'
 import { usePrefs, phaseNow } from '../lib/prefs'
@@ -9,6 +9,8 @@ import { Card, haptic } from '../ui/kit'
 import { openTask } from './Tasks'
 import { useKeyDates } from './School'
 import { SubstanceQuick } from './Substances'
+import { useRows } from '../lib/rows'
+import type { Rec } from './Records'
 
 /** Mood right now: five taps, saved as a timed mood entry (1 to 10 scale). */
 export const MOODS: [number, string, string][] = [[2, 'Rough', '#8fc4ff'], [4, 'Low', '#a98bff'], [6, 'Okay', '#cdb9ff'], [8, 'Good', '#ffc08a'], [10, 'Great', '#ffa463']]
@@ -150,8 +152,10 @@ export function useGaps() {
   const checkins = useStore((s) => s.checkins)
   const tasks = useStore((s) => s.tasks)
   const reviews = useStore((s) => s.reviews)
+  const recs = useRows<Rec>('records')
   const t = today()
   const out: { icon: string; text: string; href: string; c: string }[] = []
+  for (const r of recs ?? []) if (r.expires_on && daysUntil(r.expires_on) < 0 && daysUntil(r.expires_on) >= -90) out.push({ icon: 'layers', c: 'var(--danger)', href: '#/records', text: `${r.name} ${r.renews ? 'was due for renewal' : 'expired'} on ${fmtShort(r.expires_on)}.` })
   if (synced && Date.now() - new Date(synced).getTime() > 6 * 3600e3) out.push({ icon: 'cal', c: 'var(--sky)', href: '#/settings', text: `Google Calendar hasn’t synced since ${relTime(synced)}.` })
   else if (!synced && !events) out.push({ icon: 'cal', c: 'var(--sky)', href: '#/settings', text: 'Google Calendar hasn’t synced yet.' })
   const health = logs.filter((l) => l.source === 'health').map((l) => l.occurred_at).sort().pop()
@@ -184,12 +188,14 @@ function ComingUp() {
   const goals = useStore((s) => s.goals)
   const areas = useStore((s) => s.areas)
   const [kd] = useKeyDates()
+  const recs = useRows<Rec>('records')
   type Item = { d: string; title: string; c: string; href: string }
   const items: Item[] = []
   for (const t of tasks) if (openTask(t) && t.due_date && daysUntil(t.due_date) > 1 && daysUntil(t.due_date) <= 14 && t.priority >= 3) items.push({ d: t.due_date, title: t.title, c: areas.find((a) => a.id === t.area_id)?.color ?? 'var(--violet)', href: '#/tasks' })
   for (const p of people) { const b = nextBirthday(p); if (b && daysUntil(b) <= 21) items.push({ d: b, title: `${p.name}’s birthday`, c: 'var(--pink)', href: '#/people' }) }
   for (const g of goals) if (g.status === 'active' && !g.suggested && g.target_date && daysUntil(g.target_date) >= 0 && daysUntil(g.target_date) <= 30) items.push({ d: g.target_date, title: g.title, c: 'var(--gold)', href: '#/goals' })
   for (const k of kd ?? []) if (!k.done && (k.kind === 'exam' || k.kind === 'term') && daysUntil(k.day) > 0 && daysUntil(k.day) <= 21) items.push({ d: k.day, title: k.course ? `${k.course}: ${k.title}` : k.title, c: k.kind === 'exam' ? 'var(--pink)' : 'var(--lilac)', href: '#/school' })
+  for (const r of recs ?? []) if (r.expires_on && daysUntil(r.expires_on) >= 0 && daysUntil(r.expires_on) <= 45) items.push({ d: r.expires_on, title: `${r.name} ${r.renews ? 'renews' : 'ends'}`, c: daysUntil(r.expires_on) <= 30 ? 'var(--gold)' : 'var(--peach)', href: '#/records' })
   items.sort((a, b) => a.d.localeCompare(b.d))
   if (!items.length) return null
   return (

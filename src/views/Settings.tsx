@@ -123,6 +123,20 @@ function Appearance() {
   )
 }
 
+/** Temporary switches for trying things out. Remove once they've served their purpose. */
+function Labs() {
+  const p = usePrefs()
+  return (
+    <section class="card">
+      <div class="card-h"><h2>Previews</h2></div>
+      <div class="row between" style="padding:4px 2px">
+        <span class="grow">Expiry preview<div class="faint small">Shows a sample record as active, ending soon and expired at the top of Records.</div></span>
+        <Switch label="Expiry preview" on={p.previewExpiry} onChange={(v) => savePrefs({ previewExpiry: v }).then(() => v && (location.hash = '#/records'))} />
+      </div>
+    </section>
+  )
+}
+
 function Windows() {
   const p = usePrefs()
   const set = (k: keyof typeof p.windows, v: string) => v && savePrefs({ windows: { ...p.windows, [k]: v } })
@@ -249,6 +263,8 @@ export function Settings() {
           </div>
         ))}
       </section>
+
+      <Labs />
 
       <a class="card prompt" href="#/help" style="--accent:var(--sky)"><span class="orb"><Icon name="help" size={20} /></span><span class="grow"><h3>Help</h3><p class="muted small">Mac setup, shortcuts, changing the icon</p></span><Icon name="chev" /></a>
       <button class="btn ghost danger block" onClick={async () => { await supabase.auth.signOut(); clearData() }}><Icon name="out" size={18} /> Sign out</button>

@@ -14,6 +14,8 @@ export type Prefs = {
   sleepDefault: number
   /** What each Google calendar is, by its name. Unlisted calendars are guessed from the name. */
   calRoles: Record<string, CalRole>
+  /** Shows a sample record as active, ending soon and expired at the top of Records. Temporary. */
+  previewExpiry: boolean
 }
 export type CalRole = 'personal' | 'work' | 'classes' | 'assignments' | 'important'
 export type LogoKey = 'classic' | 'sunset' | 'night' | 'mono' | 'glass'
@@ -26,6 +28,7 @@ export const DEFAULT_PREFS: Prefs = {
   cal: { personal: true, work: true, classes: true, assignments: false, important: true },
   sleepDefault: 7,
   calRoles: {},
+  previewExpiry: false,
 }
 
 const merge = (p: Partial<Prefs> | undefined): Prefs => ({

@@ -14,7 +14,7 @@ import { PageHead, Card } from '../ui/kit'
 type Change = { id: number; at: string; table_name: string; row_id: string; op: 'INSERT' | 'UPDATE' | 'DELETE'; before: Record<string, unknown> | null; after: Record<string, unknown> | null; note: string | null; reverted_at: string | null }
 
 const TABLE: Record<string, string> = {
-  tasks: 'Task', logs: 'Log entry', checkins: 'Check-in', journal_entries: 'Journal entry', notes: 'Note', goals: 'Goal', people: 'Person',
+  tasks: 'Task', logs: 'Log entry', checkins: 'Check-in', journal_entries: 'Journal entry', notes: 'Note', records: 'Record', goals: 'Goal', people: 'Person',
   reviews: 'Weekly review', areas: 'Area', metrics: 'Tracker', courses: 'Class', degree_reqs: 'Degree requirement', scholarships: 'Scholarship',
   key_dates: 'School date', substance_logs: 'Substance entry', edu_schools: 'School', edu_courses: 'Past course', calendar_events: 'Calendar event',
 }

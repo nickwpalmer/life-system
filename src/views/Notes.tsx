@@ -41,7 +41,7 @@ export function Notes() {
     .sort((a, b) => Number(b.pinned) - Number(a.pinned) || b.updated_at.localeCompare(a.updated_at))
   return (
     <>
-      <PageHead title="Reference" sub="Things you want to find in two seconds." back="#/more" icon="note" color="var(--peach)" action={<button class="icon-btn" aria-label="New note" onClick={() => setEdit('new')}><Icon name="plus" /></button>} />
+      <PageHead title="Notes" sub="Lists, how-tos, anything to keep." back="#/records" icon="note" color="var(--peach)" action={<button class="icon-btn" aria-label="New note" onClick={() => setEdit('new')}><Icon name="plus" /></button>} />
       <input class="input" style="margin-bottom:14px;border-radius:999px" placeholder="Search" value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
       {list.length === 0 ? <div class="card"><p class="empty">{q ? 'Nothing matches.' : 'Add your first note: class schedule, gym routine, packing list…'}</p></div> : (
         <div class="notes-grid">

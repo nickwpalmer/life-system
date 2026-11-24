@@ -623,3 +623,26 @@ button.tile { text-align: left; font: inherit; cursor: pointer; }
 .freebar { display: flex; height: 10px; border-radius: 999px; overflow: hidden; margin: 8px 0; background: var(--surface-2); }
 .freebar i { display: block; height: 100%; transition: width 0.3s var(--ease); }
 .range { accent-color: var(--violet); height: 24px; }
+
+/* Records */
+.rec-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 10px; }
+.rec { position: relative; background: var(--surface); border: 1px solid var(--line); border-left: 3px solid var(--c, var(--line-2)); border-radius: 16px; padding: 14px; cursor: pointer; transition: transform 0.2s var(--spring), background 0.3s, border-color 0.3s; }
+.rec:active { transform: scale(0.98); }
+.rec h3 { font-size: 15.5px; overflow-wrap: anywhere; }
+.rec p { font-size: 13.5px; color: var(--muted); margin-top: 8px; white-space: pre-wrap; line-height: 1.45; overflow-wrap: anywhere; }
+.rec .m-ico { flex: none; }
+.rec-meta { display: flex; flex-wrap: wrap; gap: 6px 12px; margin-top: 10px; font-size: 12.5px; color: var(--faint); }
+.rec-meta span, .rec-meta a { display: inline-flex; align-items: center; gap: 5px; min-width: 0; overflow-wrap: anywhere; }
+.rec-meta a { color: var(--sky); text-decoration: none; }
+.rec .exp { display: inline-flex; align-items: center; gap: 6px; margin-top: 10px; padding: 4px 10px; border-radius: 999px; font-size: 12.5px; font-weight: 600; background: color-mix(in srgb, var(--mint) 14%, transparent); color: var(--mint); }
+.rec .exp.soon { background: color-mix(in srgb, var(--gold) 18%, transparent); color: var(--gold); }
+.rec .exp.expired { background: color-mix(in srgb, var(--danger) 20%, transparent); color: var(--danger); }
+.rec.soon { border-color: color-mix(in srgb, var(--gold) 40%, var(--line)); border-left-color: var(--gold); background: linear-gradient(135deg, color-mix(in srgb, var(--gold) 9%, var(--surface)), var(--surface) 70%); }
+.rec.expired { border-color: color-mix(in srgb, var(--danger) 45%, var(--line)); border-left-color: var(--danger); background: linear-gradient(135deg, color-mix(in srgb, var(--danger) 14%, var(--surface)), color-mix(in srgb, var(--danger) 5%, var(--surface))); }
+.rec.expired h3 { color: color-mix(in srgb, var(--danger) 55%, var(--text)); }
+.rec.expired p, .rec.expired .rec-meta { opacity: 0.7; }
+.rec .stamp { flex: none; font-size: 11px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: var(--danger); border: 1.5px solid currentColor; border-radius: 6px; padding: 2px 6px; transform: rotate(-6deg); animation: stamp-in 0.5s var(--spring); }
+@keyframes stamp-in { from { transform: rotate(-6deg) scale(1.6); opacity: 0; } to { transform: rotate(-6deg) scale(1); opacity: 1; } }
+.rec-tag { position: absolute; top: -9px; right: 12px; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; background: var(--surface-3); color: var(--muted); }
+.preview-box { border: 1px dashed var(--line-2); }
+.preview-box .rec-grid { padding-top: 6px; }
