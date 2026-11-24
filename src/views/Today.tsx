@@ -1,137 +1,170 @@
-import { useEffect, useState } from 'preact/hooks'
-import { useStore, toast, metricById } from '../lib/store'
-import { addLog, deleteLog, logsSince, listTasks, getCheckin, eventsBetween, getProfile } from '../lib/db'
-import { dailySeries, fmtValue, isOneTap } from '../lib/metrics'
-import { today, fmtLongDate, partOfDay, checkinKindNow, checkinDay, fmtTime, addDays, startOfDay } from '../lib/dates'
-import type { Log, Metric, Task, Checkin, CalEvent } from '../lib/types'
+import { useStore, setState } from '../lib/store'
+import { today, fmtLongDate, partOfDay, checkinKindNow, checkinDay, fmtTime, daysUntil, fmtDay, weekStart, dayKey, inDays, lastNDays } from '../lib/dates'
+import { dailySeries, fmtValue, consistency, LOG_GROUPS, groupOf } from '../lib/metrics'
+import { eventsOn, calColor, nextBirthday } from '../lib/cal'
 import { Icon } from '../ui/icons'
-import { haptic } from '../ui/kit'
-import { LogSheet } from './LogSheet'
-import { TaskRow, QuickAdd } from './Tasks'
+import { Card } from '../ui/kit'
+import { TaskRow, TaskSheet, AddTask, openTask } from './Tasks'
+import { useState } from 'preact/hooks'
+import type { Task } from '../lib/types'
+
+function CheckinPrompt() {
+  const checkins = useStore((s) => s.checkins)
+  const kind = checkinKindNow()
+  const t = today()
+  if (!kind) {
+    const m = checkins.find((c) => c.kind === 'morning' && c.day === t)
+    return m?.intention ? <div class="card soft"><div class="faint small">Today’s intention</div><div style="font-size:17px;margin-top:4px">{m.intention}</div></div> : null
+  }
+  const day = checkinDay(kind)
+  const done = checkins.find((c) => c.kind === kind && c.day === day)
+  if (done) {
+    const m = checkins.find((c) => c.kind === 'morning' && c.day === t)
+    return m?.intention && kind === 'morning' ? <div class="card soft"><div class="faint small">Today’s intention</div><div style="font-size:17px;margin-top:4px">{m.intention}</div></div> : null
+  }
+  const morning = kind === 'morning'
+  return (
+    <a class="card soft prompt" href={`#/checkin/${kind}`}>
+      <span class={`orb ${morning ? '' : 'cool'}`}><Icon name={morning ? 'sun' : 'moon'} size={24} /></span>
+      <span class="grow"><h3>{morning ? 'Morning check-in' : 'Night check-in'}</h3><p class="muted small">{morning ? 'Sleep, mood and your top three. About a minute.' : 'Log the day, a win, and wind down.'}</p></span>
+      <Icon name="chev" />
+    </a>
+  )
+}
+
+function Focus() {
+  const m = useStore((s) => s.checkins.find((c) => c.kind === 'morning' && c.day === today()))
+  if (!m?.top_three?.length) return null
+  return (
+    <Card title="Top three" icon="target" accent="var(--orange)">
+      {m.top_three.filter(Boolean).map((x, i) => <div class="row" style="padding:7px 0"><span class="badge" style="flex:none">{i + 1}</span><span>{x}</span></div>)}
+    </Card>
+  )
+}
+
+function Schedule() {
+  const events = useStore((s) => s.events)
+  const t = today()
+  const now = new Date().toISOString()
+  let list = eventsOn(events, t)
+  let label = 'Today'
+  if (!list.filter((e) => e.all_day || (e.ends_at ?? e.starts_at) > now).length) { list = eventsOn(events, inDays(1)); label = 'Tomorrow' }
+  return (
+    <Card title={`Schedule · ${label}`} icon="cal" accent="var(--sky)" action={<a class="link" href="#/calendar">Week</a>}>
+      {!events.length ? <p class="muted small">Your Google Calendar shows up here once it syncs.</p>
+        : !list.length ? <p class="empty" style="padding:8px">Nothing on the calendar.</p>
+          : list.slice(0, 6).map((e) => (
+            <div class="event" style={`--c:${calColor(e.calendar_name)}`}>
+              <span class="when">{e.all_day ? 'All day' : fmtTime(e.starts_at)}</span><span class="bar-v" />
+              <span class="grow"><div class="e-t">{e.title}</div>{e.location && <div class="faint small ellipsis">{e.location}</div>}</span>
+            </div>
+          ))}
+    </Card>
+  )
+}
+
+function LogSummary() {
+  const metrics = useStore((s) => s.metrics.filter((m) => m.active))
+  const logs = useStore((s) => s.logs)
+  const t = today()
+  const logged = metrics.map((m) => ({ m, v: dailySeries(m, logs, [t])[0] })).filter((x) => x.v != null)
+  const days = lastNDays(14)
+  const slipping = metrics.filter((m) => m.role === 'habit' && consistency(dailySeries(m, logs, days)).lastTwoMissed)
+  return (
+    <Card title="Daily log" icon="sliders" accent="var(--pink)" action={<span class="faint small">{logged.length}/{metrics.length}</span>}>
+      {logged.length ? <div class="logsum">{logged.map(({ m, v }) => <span style={`--c:${LOG_GROUPS.find((g) => g.key === groupOf(m))!.color}`}>{m.name} {m.kind === 'boolean' ? '✓' : fmtValue(m, v)}</span>)}</div>
+        : <p class="muted small">Nothing logged yet. Fill it in once tonight, no need to track as you go.</p>}
+      {slipping.length > 0 && <p class="small" style="margin-top:10px;color:var(--peach)">Don’t miss twice: {slipping.map((m) => m.name.toLowerCase()).join(', ')}.</p>}
+      <a class="btn block" style="margin-top:12px" href="#/log">{logged.length ? 'Update today’s log' : 'Log today'}</a>
+    </Card>
+  )
+}
+
+function ComingUp() {
+  const tasks = useStore((s) => s.tasks)
+  const people = useStore((s) => s.people)
+  const goals = useStore((s) => s.goals)
+  const areas = useStore((s) => s.areas)
+  type Item = { d: string; title: string; c: string; href: string }
+  const items: Item[] = []
+  for (const t of tasks) if (openTask(t) && t.due_date && daysUntil(t.due_date) > 0 && daysUntil(t.due_date) <= 14 && t.priority >= 2) items.push({ d: t.due_date, title: t.title, c: areas.find((a) => a.id === t.area_id)?.color ?? 'var(--violet)', href: '#/tasks' })
+  for (const p of people) { const b = nextBirthday(p); if (b && daysUntil(b) <= 30) items.push({ d: b, title: `${p.name}’s birthday`, c: 'var(--pink)', href: '#/people' }) }
+  for (const g of goals) if (g.status === 'active' && !g.suggested && g.target_date && daysUntil(g.target_date) >= 0 && daysUntil(g.target_date) <= 45) items.push({ d: g.target_date, title: g.title, c: 'var(--gold)', href: '#/goals' })
+  items.sort((a, b) => a.d.localeCompare(b.d))
+  if (!items.length) return null
+  return (
+    <Card title="Coming up" icon="flame" accent="var(--gold)">
+      {items.slice(0, 5).map((i) => {
+        const n = daysUntil(i.d)
+        return <a class="count" href={i.href} style={`--c:${i.c};color:inherit;text-decoration:none`}><span class="c-n"><b>{n === 0 ? 'Now' : n}</b><span>{n === 0 ? 'today' : n === 1 ? 'day' : 'days'}</span></span><span class="grow"><div class="ellipsis">{i.title}</div><div class="faint small">{fmtDay(i.d)}</div></span></a>
+      })}
+    </Card>
+  )
+}
+
+function NextSteps() {
+  const goals = useStore((s) => s.goals.filter((g) => g.status === 'active' && !g.suggested && g.next_step))
+  if (!goals.length) return null
+  return (
+    <Card title="Next steps on goals" icon="compass" accent="var(--gold)" action={<a class="link" href="#/goals">Goals</a>}>
+      {goals.slice(0, 3).map((g) => <div style="padding:7px 0"><div class="faint small">{g.title}</div><div class="row" style="gap:6px;color:var(--peach)"><Icon name="arrow" size={15} />{g.next_step}</div></div>)}
+    </Card>
+  )
+}
+
+function ReviewNudge() {
+  const reviews = useStore((s) => s.reviews)
+  const d = new Date().getDay() // 0 Sun
+  const ws = dayKey(weekStart())
+  const lastWs = dayKey(weekStart(new Date(Date.now() - 7 * 864e5)))
+  const due = (d === 0 || d === 6 || d === 5) ? !reviews.some((r) => r.week_start === ws) : d === 1 ? !reviews.some((r) => r.week_start === lastWs) : false
+  if (!due) return null
+  return (
+    <a class="card prompt" href="#/review" style="--accent:var(--lilac)">
+      <span class="orb cool"><Icon name="review" size={22} /></span>
+      <span class="grow"><h3>Weekly review</h3><p class="muted small">Fifteen minutes to clear your head and set up next week.</p></span><Icon name="chev" />
+    </a>
+  )
+}
 
 export function Today() {
-  const metrics = useStore((s) => s.metrics)
-  const version = useStore((s) => s.dataVersion)
-  const [logs, setLogs] = useState<Log[]>([])
-  const [tasks, setTasks] = useState<Task[] | null>(null)
-  const [checkins, setCheckins] = useState<{ morning: Checkin | null; night: Checkin | null }>({ morning: null, night: null })
-  const [events, setEvents] = useState<CalEvent[]>([])
-  const [name, setName] = useState('')
-  const [sheet, setSheet] = useState<{ open: boolean; metric: Metric | null }>({ open: false, metric: null })
-
-  const day = today()
-  useEffect(() => {
-    logsSince(1).then(setLogs).catch(() => {})
-    listTasks().then(setTasks).catch(() => setTasks([]))
-    Promise.all([getCheckin('morning', checkinDay('morning')), getCheckin('night', checkinDay('night'))])
-      .then(([morning, night]) => setCheckins({ morning, night })).catch(() => {})
-    eventsBetween(startOfDay(), addDays(startOfDay(), 1)).then(setEvents).catch(() => {})
-  }, [version])
-  useEffect(() => { getProfile().then((p) => setName(p?.display_name ?? '')).catch(() => {}) }, [])
-
-  const quick = metrics.filter((m) => m.active && m.show_today)
-  const value = (m: Metric) => dailySeries(m, logs, [day])[0]
-
-  async function tap(m: Metric, el: HTMLElement, x: number, y: number) {
-    if (!isOneTap(m)) { setSheet({ open: true, metric: m }); return }
-    const r = el.getBoundingClientRect()
-    const dot = document.createElement('span')
-    dot.className = 'ripple'
-    const s = Math.max(r.width, r.height)
-    Object.assign(dot.style, { width: `${s}px`, height: `${s}px`, left: `${x - r.left - s / 2}px`, top: `${y - r.top - s / 2}px` })
-    el.appendChild(dot); setTimeout(() => dot.remove(), 650)
-    haptic()
-    try {
-      const row = await addLog(m.id, 1)
-      const valEl = el.querySelector('.q-val'); valEl?.classList.remove('bump'); void (valEl as HTMLElement)?.offsetWidth; valEl?.classList.add('bump')
-      toast(`+1 ${m.name.toLowerCase()}`, () => deleteLog(row.id))
-    } catch (e) { toast((e as Error).message) }
-  }
-
-  const kind = checkinKindNow()
-  const due = (tasks ?? []).filter((t) => t.due_date && t.due_date <= day)
-  const top = (tasks ?? []).filter((t) => !t.due_date || t.due_date > day).filter((t) => t.priority >= 2).slice(0, 3)
-  const greet = { morning: 'Good morning', afternoon: 'Good afternoon', evening: 'Good evening', night: 'Hey night owl' }[partOfDay()]
-
+  const profile = useStore((s) => s.profile)
+  const tasks = useStore((s) => s.tasks)
+  const inbox = tasks.filter((t) => t.status === 'inbox').length
+  const [edit, setEdit] = useState<Task | null>(null)
+  const t = today()
+  const due = tasks.filter((x) => openTask(x) && x.status !== 'inbox' && (x.due_date && x.due_date <= t || x.status === 'doing'))
+    .sort((a, b) => (a.due_date ?? '').localeCompare(b.due_date ?? '') || b.priority - a.priority)
+  const doneToday = tasks.filter((x) => x.status === 'done' && x.completed_at && dayKey(new Date(x.completed_at)) === t)
+  const name = profile?.display_name || 'Nick'
+  const greet = { morning: 'Good morning', afternoon: 'Good afternoon', evening: 'Good evening', night: 'Hey' }[partOfDay()]
   return (
     <>
       <header class="hello">
-        <p class="date">{fmtLongDate()}</p>
-        <h1>{greet}{name ? <>, <span class="grad-text">{name}</span></> : null}</h1>
+        <div class="date">{fmtLongDate()}</div>
+        <h1>{greet}, <span class="grad-text">{name}</span></h1>
       </header>
-
-      {kind && !checkins[kind] && (
-        <a class="card soft prompt" href={`#/checkin/${kind}`} style="text-decoration:none;color:inherit">
-          <span class="orb"><Icon name={kind === 'morning' ? 'sun' : 'moon'} size={24} /></span>
-          <span class="grow">
-            <h3>{kind === 'morning' ? 'Morning check-in' : 'Night check-in'}</h3>
-            <p class="muted small">{kind === 'morning' ? 'Two minutes to set up the day.' : 'Close the loop on today.'}</p>
-          </span>
-          <span class="faint"><Icon name="chev" /></span>
-        </a>
-      )}
-      {(checkins.morning || checkins.night) && (
-        <div class="chips" style="margin:0 2px 14px">
-          {checkins.morning && <a class="chip on" href="#/checkin/morning"><Icon name="sun" size={15} /> Morning{checkins.morning.mood ? ` · mood ${checkins.morning.mood}` : ''}</a>}
-          {checkins.night && <a class="chip on" href="#/checkin/night"><Icon name="moon" size={15} /> Night{checkins.night.mood ? ` · mood ${checkins.night.mood}` : ''}</a>}
-          {!kind && !checkins.night && <a class="chip" href="#/checkin/night"><Icon name="moon" size={15} /> Night check-in</a>}
+      <CheckinPrompt />
+      <ReviewNudge />
+      <div class="grid-2">
+        <div>
+          <Focus />
+          <Card title="Today’s tasks" icon="tasks" accent="var(--violet)" action={<a class="link" href="#/tasks">All</a>}>
+            <AddTask defaults={{ due_date: t }} placeholder="Add for today…" />
+            {due.length ? due.map((x) => <TaskRow t={x} onOpen={setEdit} />) : <p class="empty" style="padding:6px">{doneToday.length ? `All clear. ${doneToday.length} done today.` : 'Nothing due today.'}</p>}
+            {due.length > 0 && doneToday.length > 0 && <p class="faint small" style="margin-top:8px">{doneToday.length} done today</p>}
+            {inbox > 0 && <a class="row between" href="#/inbox" style="margin-top:12px;padding:10px 12px;border-radius:14px;background:var(--surface-2);color:inherit;text-decoration:none"><span class="row"><Icon name="inbox" size={18} />{inbox} in your inbox to sort</span><Icon name="chev" size={18} /></a>}
+          </Card>
+          <NextSteps />
         </div>
-      )}
-
-      <section class="card">
-        <div class="card-h"><h2>Quick log</h2><button class="btn ghost sm" onClick={() => setSheet({ open: true, metric: null })}>More</button></div>
-        <div class="qgrid">
-          {quick.map((m) => {
-            const v = value(m)
-            return (
-              <button class={`qbtn ${m.role} ${v && m.role === 'habit' ? 'done' : ''}`}
-                onClick={(e) => tap(m, e.currentTarget as HTMLElement, (e as MouseEvent).clientX, (e as MouseEvent).clientY)}
-                onContextMenu={(e) => { e.preventDefault(); setSheet({ open: true, metric: m }) }}>
-                <span class="q-name">{m.name}</span>
-                <span class={`q-val ${v == null ? 'none' : ''}`}>{v == null ? (isOneTap(m) ? '+1' : 'Log') : fmtValue(m, v)}</span>
-              </button>
-            )
-          })}
+        <div>
+          <Schedule />
+          <LogSummary />
+          <ComingUp />
         </div>
-        <p class="faint small" style="margin-top:10px">Counters add one per tap. Press and hold any tile for more options.</p>
-      </section>
-
-      <section class="card">
-        <div class="card-h"><h2>Today’s tasks</h2><a class="btn ghost sm" href="#/tasks">All</a></div>
-        <QuickAdd defaultDue={day} />
-        {tasks == null ? null : due.length + top.length === 0
-          ? <p class="empty">Nothing due today. Add one above.</p>
-          : [...due, ...top].map((t) => <TaskRow t={t} key={t.id} />)}
-      </section>
-
-      {events.length > 0 && (
-        <section class="card">
-          <div class="card-h"><h2>Calendar</h2><a class="btn ghost sm" href="#/calendar">Week</a></div>
-          {events.map((e) => (
-            <div class="event"><span class="when">{e.all_day ? 'All day' : fmtTime(e.starts_at)}</span><span class="bar-v" /><span class="grow">{e.title}{e.location && <div class="faint small">{e.location}</div>}</span></div>
-          ))}
-        </section>
-      )}
-
-      {logs.length > 0 && (
-        <section class="card">
-          <div class="card-h"><h2>Logged today</h2></div>
-          {logs.slice(0, 12).map((l) => {
-            const m = metricById(l.metric_id)
-            if (!m) return null
-            return (
-              <div class="row between" style="padding:8px 0;border-bottom:1px solid var(--line)">
-                <span><span class="faint small" style="display:inline-block;width:68px">{fmtTime(l.occurred_at)}</span>{m.name}{l.note && <span class="faint"> · {l.note}</span>}</span>
-                <span class="row"><span class="muted">{l.value_text ?? fmtValue(m, l.value_num)}</span>
-                  <button class="faint" aria-label="Delete" onClick={() => deleteLog(l.id).then(() => toast('Deleted'))}><Icon name="x" size={16} /></button></span>
-              </div>
-            )
-          })}
-        </section>
-      )}
-
-      <button class="fab" aria-label="Log something" onClick={() => setSheet({ open: true, metric: null })}><Icon name="plus" size={28} stroke={2.4} /></button>
-      <LogSheet open={sheet.open} metric={sheet.metric} onClose={() => setSheet({ open: false, metric: null })} />
+      </div>
+      <TaskSheet task={edit} onClose={() => setEdit(null)} />
+      <button class="btn ghost block desk-only" onClick={() => setState({ capture: true })}><Icon name="plus" size={18} />Capture anything (N)</button>
     </>
   )
 }

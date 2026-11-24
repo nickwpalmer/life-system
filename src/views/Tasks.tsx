@@ -1,154 +1,186 @@
-import { useEffect, useRef, useState } from 'preact/hooks'
-import { useStore, toast, areaById } from '../lib/store'
-import { listTasks, recentlyDone, saveTask, setTaskDone, deleteTask } from '../lib/db'
-import { today, fmtDay, dayKey, addDays } from '../lib/dates'
-import type { Task } from '../lib/types'
+import { useEffect, useState } from 'preact/hooks'
+import { useStore, toast, areaById, getState } from '../lib/store'
+import { addTask, setTaskDone, update, remove, restore } from '../lib/db'
+import { parseQuick } from '../lib/parse'
+import { today, inDays, fmtDay, fmtClock, daysUntil, weekStart, dayKey, addDays } from '../lib/dates'
+import type { Task, TaskStatus } from '../lib/types'
 import { Icon } from '../ui/icons'
-import { Sheet, burst, haptic, Spinner } from '../ui/kit'
+import { Sheet, PageHead, burst, haptic } from '../ui/kit'
 
-const PRI = ['None', 'Low', 'Medium', 'High']
+export const openTask = (t: Task) => t.status !== 'done' && t.status !== 'dropped'
 
-export function TaskRow({ t }: { t: Task }) {
-  const [done, setDone] = useState(t.status === 'done')
-  const [edit, setEdit] = useState(false)
-  const ref = useRef<HTMLButtonElement>(null)
-  const area = areaById(t.area_id)
-  const overdue = !done && t.due_date && t.due_date < today()
-  async function toggle() {
-    const next = !done
-    setDone(next); haptic()
-    if (next) burst(ref.current)
-    try {
-      await setTaskDone(t.id, next)
-      if (next) toast('Done. Nice.', () => setTaskDone(t.id, false))
-    } catch (e) { setDone(!next); toast((e as Error).message) }
+export function dueLabel(t: Task) {
+  if (!t.due_date) return null
+  const n = daysUntil(t.due_date)
+  const cls = n < 0 ? 'overdue' : n <= 1 ? 'soon' : ''
+  const txt = n < 0 ? (n === -1 ? 'Yesterday' : `${-n} days late`) : fmtDay(t.due_date)
+  return <span class={cls}>{txt}{t.due_time ? ` ${fmtClock(t.due_time)}` : ''}</span>
+}
+
+export function TaskRow({ t, onOpen, process }: { t: Task; onOpen: (t: Task) => void; process?: boolean }) {
+  const a = areaById(t.area_id)
+  const done = t.status === 'done'
+  const goal = useStore((s) => s.goals.find((g) => g.id === t.goal_id))
+  function toggle(e: Event) {
+    e.stopPropagation(); haptic()
+    if (!done) burst(e.currentTarget as Element)
+    setTaskDone(t.id, !done).catch(() => {})
+    if (!done) toast('Done', () => setTaskDone(t.id, false))
   }
+  const file = (patch: Partial<Task>, msg: string) => { update('tasks', t.id, { status: 'open', ...patch }).then(() => toast(msg)).catch(() => {}) }
   return (
     <div class={`task ${done ? 'done' : ''}`}>
-      <button ref={ref} class={`check p${t.priority} ${done ? 'on' : ''}`} onClick={toggle} aria-label={done ? 'Mark not done' : 'Complete'}>
-        <Icon name="check" size={15} stroke={3} />
-      </button>
-      <div class="grow" onClick={() => setEdit(true)} style="cursor:pointer">
+      <button class={`check p${t.priority} ${done ? 'on' : ''}`} aria-label={done ? 'Mark not done' : 'Mark done'} onClick={toggle}><Icon name="check" size={15} stroke={3} /></button>
+      <div class="grow" onClick={() => onOpen(t)} style="cursor:pointer">
         <div class="t-title">{t.title}</div>
-        {(t.due_date || area || t.notes) && (
-          <div class="t-meta">
-            {t.due_date && <span class={overdue ? 'overdue' : ''}>{fmtDay(t.due_date)}{t.due_time ? ` ${t.due_time.slice(0, 5)}` : ''}</span>}
-            {area && <span class="row" style="gap:5px"><i class="dot" style={`background:${area.color}`} />{area.name}</span>}
-            {t.notes && <span>has notes</span>}
+        <div class="t-meta">
+          {dueLabel(t)}
+          {a && <span class="pill" style={`--c:${a.color}`}>{a.name}</span>}
+          {t.status === 'waiting' && <span class="pill" style="--c:var(--sky)">Waiting</span>}
+          {goal && <span class="row" style="gap:3px"><Icon name="target" size={12} />{goal.title}</span>}
+          {t.tags?.filter((x) => x !== 'someday').slice(0, 2).map((x) => <span>#{x}</span>)}
+        </div>
+        {process && !done && (
+          <div class="process" onClick={(e) => e.stopPropagation()}>
+            <button onClick={() => file({ due_date: today() }, 'Moved to today')}>Today</button>
+            <button onClick={() => file({ due_date: inDays(1) }, 'Moved to tomorrow')}>Tomorrow</button>
+            <button onClick={() => file({ due_date: dayKey(addDays(weekStart(), 7)) }, 'Moved to next week')}>Next week</button>
+            <button onClick={() => file({}, 'Filed, no date')}>No date</button>
+            <button onClick={() => file({ tags: [...(t.tags ?? []), 'someday'] }, 'Moved to someday')}>Someday</button>
+            <button onClick={() => onOpen(t)}>Edit</button>
           </div>
         )}
       </div>
-      <TaskEditor open={edit} task={t} onClose={() => setEdit(false)} />
     </div>
   )
 }
 
-export function QuickAdd({ defaultDue, areaId }: { defaultDue?: string; areaId?: string | null }) {
-  const [title, setTitle] = useState('')
-  const [busy, setBusy] = useState(false)
-  async function add(e: Event) {
-    e.preventDefault()
-    const v = title.trim(); if (!v) return
-    // "!" anywhere makes it high priority: "call advisor !"
-    const priority = v.includes('!!') ? 3 : v.includes('!') ? 2 : 0
-    setBusy(true)
-    try { await saveTask({ title: v.replace(/!+/g, '').trim(), due_date: defaultDue ?? null, area_id: areaId ?? null, priority }); setTitle(''); haptic() }
-    catch (e) { toast((e as Error).message) }
-    setBusy(false)
-  }
-  return (
-    <form class="add-row" onSubmit={add} style="margin-bottom:6px">
-      <input class="input" placeholder="Add a task…" value={title} onInput={(e) => setTitle((e.target as HTMLInputElement).value)} enterKeyHint="done" />
-      <button class="icon-btn" style="width:46px;height:46px;flex:none" disabled={busy || !title.trim()} aria-label="Add"><Icon name="plus" /></button>
-    </form>
-  )
-}
-
-export function TaskEditor({ open, task, onClose }: { open: boolean; task?: Task | null; onClose: () => void }) {
+export function TaskSheet({ task, onClose }: { task: Task | null; onClose: () => void }) {
   const areas = useStore((s) => s.areas.filter((a) => !a.archived))
+  const goals = useStore((s) => s.goals.filter((g) => g.status === 'active' && !g.suggested))
   const [f, setF] = useState<Partial<Task>>({})
-  useEffect(() => { if (open) setF(task ? { ...task } : { title: '', priority: 0, status: 'open' }) }, [open])
-  const set = (p: Partial<Task>) => setF({ ...f, ...p })
+  useEffect(() => { if (task) setF({ ...task }) }, [task?.id])
+  if (!task) return <Sheet open={false} onClose={onClose}>{null}</Sheet>
   async function save() {
     if (!f.title?.trim()) return
-    try { await saveTask({ ...f, title: f.title.trim() } as Task); onClose() } catch (e) { toast((e as Error).message) }
+    const { title, notes, area_id, due_date, due_time, priority, status, goal_id, tags } = f
+    const st = status === 'inbox' && (due_date || area_id) ? 'open' : status
+    try { await update('tasks', task!.id, { title: title.trim(), notes: notes || null, area_id: area_id ?? null, due_date: due_date || null, due_time: due_time || null, priority: priority ?? 0, status: st, goal_id: goal_id ?? null, tags: tags ?? [] }); onClose() } catch { /* shown */ }
   }
-  const quickDates: [string, string][] = [['Today', today()], ['Tomorrow', dayKey(addDays(new Date(), 1))], ['Next week', dayKey(addDays(new Date(), 7))]]
+  async function del() {
+    const row = getState().tasks.find((x) => x.id === task!.id)
+    onClose()
+    await remove('tasks', task!.id).catch(() => {})
+    if (row) toast('Task deleted', () => restore('tasks', row as never))
+  }
+  const someday = f.tags?.includes('someday')
   return (
-    <Sheet open={open} onClose={onClose} title={task ? 'Edit task' : 'New task'}>
-      <label class="field"><span>Task</span><input class="input" value={f.title ?? ''} onInput={(e) => set({ title: (e.target as HTMLInputElement).value })} /></label>
-      <div class="field"><span>Due</span>
-        <div class="chips" style="margin-bottom:8px">
-          {quickDates.map(([l, d]) => <button class={`chip ${f.due_date === d ? 'on' : ''}`} onClick={() => set({ due_date: d })}>{l}</button>)}
-          <button class={`chip ${!f.due_date ? 'on' : ''}`} onClick={() => set({ due_date: null, due_time: null })}>Someday</button>
-        </div>
-        <div class="row"><input class="input" type="date" value={f.due_date ?? ''} onInput={(e) => set({ due_date: (e.target as HTMLInputElement).value || null })} />
-          <input class="input" type="time" value={f.due_time?.slice(0, 5) ?? ''} onInput={(e) => set({ due_time: (e.target as HTMLInputElement).value || null })} /></div>
+    <Sheet open={!!task} onClose={save} title="Task">
+      <input class="input title bare" value={f.title ?? ''} onInput={(e) => setF({ ...f, title: (e.target as HTMLInputElement).value })} />
+      <textarea class="input" style="margin:8px 0 14px;min-height:70px" placeholder="Notes, links, next step…" value={f.notes ?? ''} onInput={(e) => setF({ ...f, notes: (e.target as HTMLTextAreaElement).value })} />
+      <div class="row">
+        <label class="field grow"><span>Due</span><input class="input" type="date" value={f.due_date ?? ''} onInput={(e) => setF({ ...f, due_date: (e.target as HTMLInputElement).value || null })} /></label>
+        <label class="field" style="width:42%"><span>Time</span><input class="input" type="time" value={f.due_time?.slice(0, 5) ?? ''} onInput={(e) => setF({ ...f, due_time: (e.target as HTMLInputElement).value || null })} /></label>
       </div>
-      <div class="field"><span>Priority</span>
-        <div class="chips">{PRI.map((p, i) => <button class={`chip ${f.priority === i ? 'on' : ''}`} onClick={() => set({ priority: i })}>{p}</button>)}</div>
+      <div class="chips" style="margin:-4px 0 14px">
+        {[['Today', today()], ['Tomorrow', inDays(1)], ['Next week', dayKey(addDays(weekStart(), 7))], ['No date', null]].map(([l, d]) => <button class={`chip ${f.due_date === d ? 'on' : ''}`} onClick={() => setF({ ...f, due_date: d })}>{l}</button>)}
       </div>
-      <div class="field"><span>Area</span>
-        <div class="chips">
-          {areas.map((a) => <button class={`chip ${f.area_id === a.id ? 'on' : ''}`} onClick={() => set({ area_id: f.area_id === a.id ? null : a.id })}><i class="dot" style={`background:${a.color}`} />{a.name}</button>)}
-        </div>
-      </div>
-      <label class="field"><span>Notes</span><textarea class="input" value={f.notes ?? ''} onInput={(e) => set({ notes: (e.target as HTMLTextAreaElement).value || null })} /></label>
+      <div class="field"><span>Area</span><div class="chips">{areas.map((a) => <button class={`chip ${f.area_id === a.id ? 'on' : ''}`} style={`--c:${a.color}`} onClick={() => setF({ ...f, area_id: f.area_id === a.id ? null : a.id })}><i class="dot" style={`background:${a.color}`} />{a.name}</button>)}</div></div>
+      <div class="field"><span>Priority</span><div class="chips">{[['None', 0, 'var(--faint)'], ['Low', 1, 'var(--sky)'], ['Medium', 2, 'var(--orange)'], ['High', 3, 'var(--coral)']].map(([l, p, c]) => <button class={`chip ${f.priority === p ? 'on' : ''}`} style={`--c:${c}`} onClick={() => setF({ ...f, priority: p as number })}>{l}</button>)}</div></div>
+      <div class="field"><span>Status</span><div class="chips">
+        {([['inbox', 'Inbox'], ['open', 'To do'], ['doing', 'Doing'], ['waiting', 'Waiting on someone']] as [TaskStatus, string][]).map(([s, l]) => <button class={`chip ${f.status === s ? 'on' : ''}`} onClick={() => setF({ ...f, status: s })}>{l}</button>)}
+        <button class={`chip ${someday ? 'on' : ''}`} onClick={() => setF({ ...f, tags: someday ? (f.tags ?? []).filter((x) => x !== 'someday') : [...(f.tags ?? []), 'someday'] })}>Someday</button>
+      </div></div>
+      {goals.length > 0 && <div class="field"><span>Moves this goal forward</span><div class="chips">{goals.map((g) => <button class={`chip ${f.goal_id === g.id ? 'on' : ''}`} style="--c:var(--gold)" onClick={() => setF({ ...f, goal_id: f.goal_id === g.id ? null : g.id })}>{g.title}</button>)}</div></div>}
       <button class="btn primary block" onClick={save}>Save</button>
-      {task && <button class="btn ghost danger block" style="margin-top:8px" onClick={async () => { if (confirm('Delete this task?')) { await deleteTask(task.id); onClose(); toast('Task deleted') } }}><Icon name="trash" size={18} /> Delete</button>}
+      <button class="btn ghost danger block" style="margin-top:8px" onClick={del}><Icon name="trash" size={18} /> Delete</button>
     </Sheet>
   )
 }
 
-export function Tasks() {
-  const version = useStore((s) => s.dataVersion)
-  const areas = useStore((s) => s.areas.filter((a) => !a.archived))
-  const [tasks, setTasks] = useState<Task[] | null>(null)
-  const [done, setDone] = useState<Task[]>([])
-  const [filter, setFilter] = useState<'today' | 'upcoming' | 'all' | 'done'>('today')
-  const [area, setArea] = useState<string | null>(null)
-  const [newOpen, setNewOpen] = useState(false)
+/** Quick add bar: understands dates, times, !priority and #area as you type. */
+export function AddTask({ defaults, placeholder = 'Add a task… try “essay fri 5pm #education”' }: { defaults?: Partial<Task>; placeholder?: string }) {
+  const areas = useStore((s) => s.areas)
+  const [v, setV] = useState('')
+  const p = parseQuick(v, areas)
+  async function add(e: Event) {
+    e.preventDefault()
+    if (!v.trim()) return
+    const title = p.title || v.trim()
+    setV('')
+    const d = defaults ?? {}
+    const status = d.status === 'inbox' && (p.due_date || p.area_id) ? 'open' : d.status ?? 'open'
+    addTask({ ...d, title, status, due_date: p.due_date ?? d.due_date ?? null, due_time: p.due_time, priority: p.priority || d.priority || 0, area_id: p.area_id ?? d.area_id ?? null }).catch(() => {})
+  }
+  const a = areas.find((x) => x.id === p.area_id)
+  return (
+    <form onSubmit={add} style="margin-bottom:14px">
+      <div class="add-row">
+        <input class="input" placeholder={placeholder} value={v} onInput={(e) => setV((e.target as HTMLInputElement).value)} />
+        <button class="icon-btn" style="width:48px;height:48px;background:var(--grad);color:#1d1330;border:0" aria-label="Add task"><Icon name="plus" stroke={2.6} /></button>
+      </div>
+      <p class="hint">{v.trim() && (p.due_date || a || p.priority) ? <>{p.due_date && <><b>{fmtDay(p.due_date)}</b>{p.due_time ? <> {fmtClock(p.due_time)}</> : null} </>}{a && <><b>{a.name}</b> </>}{p.priority ? <b>{'!'.repeat(p.priority)}</b> : null}</> : ''}</p>
+    </form>
+  )
+}
 
-  useEffect(() => {
-    listTasks().then(setTasks).catch(() => setTasks([]))
-    if (filter === 'done') recentlyDone(14).then(setDone).catch(() => {})
-  }, [version, filter])
+type View = 'inbox' | 'today' | 'upcoming' | 'areas' | 'someday' | 'done'
 
+export function Tasks({ initial }: { initial?: View }) {
+  const tasks = useStore((s) => s.tasks)
+  const areas = useStore((s) => s.areas)
+  const inboxN = tasks.filter((t) => t.status === 'inbox').length
+  const [view, setView] = useState<View>(initial ?? (inboxN ? 'inbox' : 'today'))
+  const [edit, setEdit] = useState<Task | null>(null)
   const t0 = today()
-  let list = filter === 'done' ? done : (tasks ?? [])
-  if (filter === 'today') list = list.filter((t) => t.due_date && t.due_date <= t0)
-  if (filter === 'upcoming') list = list.filter((t) => t.due_date && t.due_date > t0)
-  if (area) list = list.filter((t) => t.area_id === area)
+  const open = tasks.filter(openTask)
+  const active = open.filter((t) => t.status !== 'inbox' && !t.tags?.includes('someday'))
+  const byDue = (a: Task, b: Task) => (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999') || (a.due_time ?? '').localeCompare(b.due_time ?? '') || b.priority - a.priority
+  const todayList = active.filter((t) => t.due_date && t.due_date <= t0 || t.status === 'doing').sort(byDue)
+  const upcoming = active.filter((t) => t.due_date && t.due_date > t0).sort(byDue)
+  const nodate = active.filter((t) => !t.due_date && t.status !== 'doing').sort((a, b) => b.priority - a.priority)
+  const row = (t: Task) => <TaskRow t={t} onOpen={setEdit} process={view === 'inbox'} />
 
-  // Group upcoming/all by day for a calmer read.
-  const groups = new Map<string, Task[]>()
-  for (const t of list) {
-    const k = filter === 'done' ? 'Done recently' : t.due_date ? (t.due_date < t0 ? 'Overdue' : fmtDay(t.due_date)) : 'Someday'
-    groups.set(k, [...(groups.get(k) ?? []), t])
+  const tabs: [View, string, number?][] = [['inbox', 'Inbox', inboxN], ['today', 'Today', todayList.length], ['upcoming', 'Upcoming'], ['areas', 'By area'], ['someday', 'Someday'], ['done', 'Done']]
+  let body
+  if (view === 'inbox') {
+    const inbox = open.filter((t) => t.status === 'inbox').sort((a, b) => a.created_at.localeCompare(b.created_at))
+    body = <section class="card">
+      <p class="muted small" style="margin-bottom:6px">Give each one a home: a day, or no date. If it takes two minutes, just do it.</p>
+      {inbox.length ? inbox.map(row) : <p class="empty">Inbox zero. Anything you capture lands here first.</p>}
+    </section>
+  } else if (view === 'today') {
+    body = <>
+      <section class="card">{todayList.length ? todayList.map(row) : <p class="empty">Nothing due today. Pick something from below, or enjoy it.</p>}</section>
+      {nodate.length > 0 && <section class="card"><div class="card-h"><h2>Anytime</h2><span class="faint small">{nodate.length}</span></div>{nodate.slice(0, 12).map(row)}</section>}
+    </>
+  } else if (view === 'upcoming') {
+    const groups = new Map<string, Task[]>()
+    for (const t of upcoming) { const k = t.due_date!; groups.set(k, [...(groups.get(k) ?? []), t]) }
+    body = <section class="card">{upcoming.length ? [...groups].map(([d, ts]) => <><div class="group-h"><span>{fmtDay(d)}</span><span>{daysUntil(d)}d</span></div>{ts.map(row)}</>) : <p class="empty">Nothing scheduled ahead.</p>}</section>
+  } else if (view === 'areas') {
+    body = <>{areas.filter((a) => !a.archived).map((a) => {
+      const ts = active.filter((t) => t.area_id === a.id).sort(byDue)
+      return ts.length ? <section class="card" style={`--accent:${a.color}`}><div class="card-h"><h2 style={`color:${a.color}`}>{a.name}</h2><a class="link" href={`#/area/${a.key}`}>Open</a></div>{ts.map(row)}</section> : null
+    })}{active.filter((t) => !t.area_id).length > 0 && <section class="card"><div class="card-h"><h2>No area</h2></div>{active.filter((t) => !t.area_id).map(row)}</section>}</>
+  } else if (view === 'someday') {
+    const s = open.filter((t) => t.tags?.includes('someday'))
+    body = <section class="card"><p class="muted small" style="margin-bottom:6px">Ideas you’re not committing to yet. Look through them in your weekly review.</p>{s.length ? s.map(row) : <p class="empty">Nothing parked here.</p>}</section>
+  } else {
+    const since = dayKey(addDays(new Date(), -14))
+    const d = tasks.filter((t) => t.status === 'done' && t.completed_at && dayKey(new Date(t.completed_at)) >= since).sort((a, b) => (b.completed_at ?? '').localeCompare(a.completed_at ?? ''))
+    body = <section class="card"><div class="card-h"><h2>Last two weeks</h2><span class="faint small">{d.length} done</span></div>{d.length ? d.map(row) : <p class="empty">Finished tasks show up here.</p>}</section>
   }
 
   return (
     <>
-      <div class="page-title"><h1>Tasks</h1><button class="icon-btn" aria-label="New task" onClick={() => setNewOpen(true)}><Icon name="plus" /></button></div>
-      <div class="chips" style="margin:0 2px 10px">
-        {(['today', 'upcoming', 'all', 'done'] as const).map((f) => <button class={`chip ${filter === f ? 'on' : ''}`} onClick={() => setFilter(f)}>{f[0].toUpperCase() + f.slice(1)}</button>)}
+      <PageHead title="Tasks" icon="tasks" color="var(--violet)" />
+      <AddTask defaults={view === 'today' ? { due_date: t0 } : view === 'inbox' ? { status: 'inbox' } : undefined} />
+      <div class="chips scroll" style="margin-bottom:14px">
+        {tabs.map(([v, l, n]) => <button class={`chip ${view === v ? 'on' : ''}`} onClick={() => setView(v)}>{l}{n ? <span class={`badge ${v === 'inbox' ? '' : 'quiet'}`} style="height:18px;min-width:18px;font-size:11px">{n}</span> : null}</button>)}
       </div>
-      <div class="chips" style="margin:0 2px 14px">
-        {areas.map((a) => <button class={`chip ${area === a.id ? 'on' : ''}`} onClick={() => setArea(area === a.id ? null : a.id)}><i class="dot" style={`background:${a.color}`} />{a.name}</button>)}
-      </div>
-      <section class="card">
-        {filter !== 'done' && <QuickAdd defaultDue={filter === 'today' ? t0 : undefined} areaId={area} />}
-        {tasks == null ? <Spinner /> : list.length === 0 ? <p class="empty">{filter === 'today' ? 'Clear for today.' : 'Nothing here yet.'}</p> : (
-          [...groups].map(([k, ts]) => (
-            <div>
-              {groups.size > 1 && <div class={`faint small ${k === 'Overdue' ? 'overdue' : ''}`} style="margin:14px 2px 2px">{k}</div>}
-              {ts.map((t) => <TaskRow t={t} key={t.id} />)}
-            </div>
-          ))
-        )}
-      </section>
-      <p class="faint small" style="text-align:center">Tip: end a task with ! for medium priority, !! for high.</p>
-      <TaskEditor open={newOpen} onClose={() => setNewOpen(false)} />
+      {body}
+      <TaskSheet task={edit} onClose={() => setEdit(null)} />
     </>
   )
 }

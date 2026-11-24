@@ -9,21 +9,21 @@ export default defineConfig({
     preact(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['icon.svg', 'apple-touch-icon.png'],
+      includeAssets: ['icon.svg', 'apple-touch-icon.png', 'icon-maskable-512.png'],
       manifest: {
         name: 'Life',
         short_name: 'Life',
         description: 'Nick’s private life system',
-        theme_color: '#14111c',
-        background_color: '#14111c',
+        id: '/life-system/',
+        theme_color: '#120d1c',
+        background_color: '#120d1c',
         display: 'standalone',
-        orientation: 'portrait',
         start_url: '/life-system/',
         scope: '/life-system/',
         icons: [
           { src: 'icon-192.png', sizes: '192x192', type: 'image/png' },
           { src: 'icon-512.png', sizes: '512x512', type: 'image/png' },
-          { src: 'icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
+          { src: 'icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' }
         ]
       },
       workbox: {

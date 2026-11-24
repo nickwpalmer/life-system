@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'preact/hooks'
 import { supabase, lockEnabled, setLockFlag } from '../lib/supabase'
 import { useStore, toast, getState } from '../lib/store'
-import { saveMetric, saveArea, getProfile, saveProfile } from '../lib/db'
+import { saveMetric, saveArea, saveProfile, clearData } from '../lib/db'
 import { passkeySupported } from '../lib/lock'
 import { ROLE_LABEL } from '../lib/metrics'
 import type { Area, Metric, MetricKind, MetricRole } from '../lib/types'
 import { Icon } from '../ui/icons'
-import { Sheet, Switch, BackHeader } from '../ui/kit'
+import { Sheet, Switch, PageHead } from '../ui/kit'
 
 type Passkey = { id: string; friendly_name?: string; created_at: string; last_used_at?: string }
 
@@ -84,7 +84,7 @@ function MetricEditor({ open, metric, onClose }: { open: boolean; metric: Metric
   )
 }
 
-const PALETTE = ['#fdba74', '#c4b5fd', '#f9a8d4', '#86efac', '#fcd34d', '#fda4af', '#a5b4fc', '#99f6e4', '#fed7aa', '#ddd6fe']
+const PALETTE = ['#ffa463', '#a98bff', '#ff8cc8', '#79e2b4', '#ffd66b', '#ff8a7a', '#8fc4ff', '#6fe0dc', '#ffc08a', '#cdb9ff']
 
 function AreaEditor({ open, area, onClose }: { open: boolean; area: Area | null; onClose: () => void }) {
   const [f, setF] = useState<Partial<Area>>({})
@@ -106,11 +106,11 @@ function AreaEditor({ open, area, onClose }: { open: boolean; area: Area | null;
 export function Settings() {
   const metrics = useStore((s) => s.metrics)
   const areas = useStore((s) => s.areas)
-  const [name, setName] = useState('')
+  const profile = useStore((s) => s.profile)
+  const [name, setName] = useState(profile?.display_name ?? '')
   const [pw, setPw] = useState('')
   const [mEdit, setMEdit] = useState<{ open: boolean; m: Metric | null }>({ open: false, m: null })
   const [aEdit, setAEdit] = useState<{ open: boolean; a: Area | null }>({ open: false, a: null })
-  useEffect(() => { getProfile().then((p) => setName(p?.display_name ?? '')).catch(() => {}) }, [])
 
   async function changePw() {
     if (pw.length < 10) { toast('Use at least 10 characters'); return }
@@ -120,7 +120,7 @@ export function Settings() {
 
   return (
     <>
-      <BackHeader title="Settings" />
+      <PageHead title="Settings" back="#/more" icon="gear" color="var(--muted)" />
       <section class="card">
         <div class="card-h"><h2>You</h2></div>
         <label class="field"><span>What should the app call you?</span>
@@ -130,6 +130,11 @@ export function Settings() {
       </section>
 
       <Security />
+
+      <section class="card">
+        <div class="card-h"><h2>On your Mac</h2></div>
+        <p class="muted small" style="line-height:1.55">Open this page in Safari, then choose File, Add to Dock. Your iPhone passkey syncs through iCloud Keychain, so the Mac signs in with Touch ID or your iPhone. If it doesn’t show up, sign in with your password once and tap “Add Face ID on this device” above. Press N anywhere to capture, and 1 to 7 to jump between screens.</p>
+      </section>
 
       <section class="card">
         <div class="card-h"><h2>Trackers</h2><button class="btn ghost sm" onClick={() => setMEdit({ open: true, m: null })}>Add</button></div>
@@ -160,8 +165,8 @@ export function Settings() {
         <div class="row"><input class="input grow" type="password" autocomplete="new-password" placeholder="New password" value={pw} onInput={(e) => setPw((e.target as HTMLInputElement).value)} /><button class="btn" onClick={changePw}>Save</button></div>
       </section>
 
-      <button class="btn ghost danger block" onClick={() => supabase.auth.signOut()}><Icon name="out" size={18} /> Sign out</button>
-      <p class="faint small" style="text-align:center;margin-top:16px">Life v0.1</p>
+      <button class="btn ghost danger block" onClick={async () => { await supabase.auth.signOut(); clearData() }}><Icon name="out" size={18} /> Sign out</button>
+      <p class="faint small" style="text-align:center;margin-top:16px">Life v0.2</p>
 
       <MetricEditor open={mEdit.open} metric={mEdit.m} onClose={() => setMEdit({ open: false, m: null })} />
       <AreaEditor open={aEdit.open} area={aEdit.a} onClose={() => setAEdit({ open: false, a: null })} />

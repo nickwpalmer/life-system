@@ -61,3 +61,23 @@ export const relTime = (iso: string) => {
   if (s < 86400) return `${Math.floor(s / 3600)}h ago`
   return fmtDay(dayKey(new Date(iso)))
 }
+
+/** Monday of the week containing d. */
+export const weekStart = (d: Date = new Date()) => { const x = startOfDay(d); const wd = (x.getDay() + 6) % 7; return addDays(x, -wd) }
+
+export const daysBetween = (a: string, b: string) => Math.round((fromKey(b).getTime() - fromKey(a).getTime()) / 86400000)
+
+export const daysUntil = (k: string) => daysBetween(today(), k)
+
+export const fmtShort = (k: string) => fromKey(k).toLocaleDateString([], { month: 'short', day: 'numeric' })
+
+export const fmtWeekday = (k: string) => fromKey(k).toLocaleDateString([], { weekday: 'short' })
+
+export const inDays = (n: number) => dayKey(addDays(new Date(), n))
+
+export const fmtClock = (t: string | null | undefined) => {
+  if (!t) return ''
+  const [h, m] = t.split(':').map(Number)
+  const d = new Date(); d.setHours(h, m, 0, 0)
+  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+}
