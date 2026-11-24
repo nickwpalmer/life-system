@@ -6,12 +6,13 @@ import { Icon } from '../ui/icons'
 import { Card, PageHead, Ring, Sheet } from '../ui/kit'
 import { SchoolPanel, useKeyDates } from './School'
 import { courseOf, kindOf, KINDS, openTask } from './Tasks'
+import { GradeTracker, computeGrade, type Cat, type Item } from './GradeTracker'
 
 /**
  * Education: your own little LMS. Classes this term, the degree plan, scholarships,
  * and every school you've been to, so you can see how far you've come.
  */
-type Course = { id: string; code: string; name: string | null; term: string; credits: number | null; instructor: string | null; meets: string | null; color: string | null; starts_on: string | null; ends_on: string | null; status: 'current' | 'planned' | 'done' | 'dropped'; grade: string | null; sort: number }
+type Course = { id: string; code: string; name: string | null; term: string; credits: number | null; instructor: string | null; meets: string | null; color: string | null; starts_on: string | null; ends_on: string | null; status: 'current' | 'planned' | 'done' | 'dropped'; grade: string | null; sort: number; data?: { grading?: Cat[] } | null }
 type Req = { id: string; program: string; grp: string; code: string | null; title: string; credits: number | null; status: 'needed' | 'planned' | 'in_progress' | 'done' | 'waived' | 'pending' | 'open'; term: string | null; grade: string | null; notes: string | null; sort: number }
 type Scholarship = { id: string; name: string; sponsor: string | null; amount: number | null; amount_note: string | null; deadline: string | null; decision_on: string | null; url: string | null; requirements: string | null; notes: string | null; renewable: boolean | null; status: 'maybe' | 'to_apply' | 'applied' | 'awarded' | 'declined' | 'missed' }
 type School = { id: string; name: string; kind: string; started: string | null; ended: string | null; credential: string | null; honors: string | null; gpa: number | null; credits: number | null; notes: string | null; sort: number }
@@ -124,7 +125,9 @@ function GradeCard({ course, color }: { course: Course; color: string }) {
 function ClassTile({ c, i }: { c: Course; i: number }) {
   const w = useWork(c.code)
   const g = useGrades(c.id)
-  const last = g[g.length - 1]
+  const items = (useRows<Item>('grade_items') ?? []).filter((x) => x.course_id === c.id)
+  const tr = c.data?.grading ? computeGrade(c.data.grading, items).pct : null
+  const last = g[g.length - 1] ?? (tr != null ? { letter: letterFor(tr), estimate: tr } : undefined)
   const t0 = today()
   const late = w.open.filter((t) => t.due_date && t.due_date < t0).length
   const pct = w.total ? w.done / w.total : termPct(c) ?? 0
@@ -219,6 +222,7 @@ function ClassPage({ code }: { code: string }) {
         </div>
       )}
       {c && (c.instructor || c.meets) && <p class="muted small" style="margin:0 4px 14px">{[c.instructor, c.meets].filter(Boolean).join(' · ')}</p>}
+      {c && <GradeTracker course={c} color={color} />}
       {c && <GradeCard course={c} color={color} />}
       {dates.length > 0 && <Card title="Key dates" icon="flame" accent="var(--pink)">{dates.map((k) => <div class="row between" style="padding:7px 0;border-bottom:1px solid var(--line)"><span>{k.title}{k.kind === 'exam' && <span class="pill" style="--c:var(--pink);margin-left:6px">Exam</span>}</span><span class="faint small">{fmtDay(k.day)}</span></div>)}</Card>}
       {[...KINDS, { key: 'other', label: 'Other' }].map((k) => {

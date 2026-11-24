@@ -31,6 +31,15 @@ export function dueLabel(t: Task) {
   return <span class={cls}>{txt}{t.due_time ? ` ${fmtClock(t.due_time)}` : ''}</span>
 }
 
+/** A checklist lives in a task's notes as lines like "- [ ] step" and "- [x] step". */
+const CHECK = /^- \[( |x)\] (.+)$/i
+export function checklist(notes: string | null | undefined) {
+  return (notes ?? '').split('\n').map((l, i) => { const m = l.match(CHECK); return m ? { i, done: m[1].toLowerCase() === 'x', text: m[2] } : null }).filter(Boolean) as { i: number; done: boolean; text: string }[]
+}
+function toggleLine(notes: string, i: number) {
+  return notes.split('\n').map((l, j) => j === i ? l.replace(/^- \[( |x)\]/i, (m) => m.toLowerCase() === '- [x]' ? '- [ ]' : '- [x]') : l).join('\n')
+}
+
 export function TaskRow({ t, onOpen, process }: { t: Task; onOpen: (t: Task) => void; process?: boolean }) {
   const a = areaById(t.area_id)
   const done = t.status === 'done'
@@ -49,6 +58,7 @@ export function TaskRow({ t, onOpen, process }: { t: Task; onOpen: (t: Task) => 
         <div class="t-title"><PeopleText text={t.title} /></div>
         <div class="t-meta">
           {dueLabel(t)}
+          {(() => { const c = checklist(t.notes); return c.length ? <span class="row" style="gap:3px"><Icon name="list" size={12} />{c.filter((x) => x.done).length}/{c.length}</span> : null })()}
           {a && <span class="pill" style={`--c:${a.color}`}>{a.name}</span>}
           {t.status === 'waiting' && <span class="pill" style="--c:var(--sky)">Waiting</span>}
           {goal && <span class="row" style="gap:3px"><Icon name="target" size={12} />{goal.title}</span>}
@@ -90,7 +100,12 @@ export function TaskSheet({ task, onClose }: { task: Task | null; onClose: () =>
   return (
     <Sheet open={!!task} onClose={save} title="Task">
       <input class="input title bare" value={f.title ?? ''} onInput={(e) => setF({ ...f, title: (e.target as HTMLInputElement).value })} />
-      <textarea class="input" style="margin:8px 0 14px;min-height:70px" placeholder="Notes, links, next step…" value={f.notes ?? ''} onInput={(e) => setF({ ...f, notes: (e.target as HTMLTextAreaElement).value })} />
+      {checklist(f.notes).length > 0 && <div class="tchecks">{checklist(f.notes).map((c) => (
+        <button class={`tcheck ${c.done ? 'on' : ''}`} onClick={() => { haptic(); const notes = toggleLine(f.notes ?? '', c.i); setF({ ...f, notes }); update('tasks', task!.id, { notes }).catch(() => {}) }}>
+          <span class="tbox"><Icon name="check" size={12} stroke={3} /></span><span class="grow">{c.text}</span>
+        </button>
+      ))}</div>}
+      <textarea class="input" style="margin:8px 0 14px;min-height:70px" placeholder="Notes, links, next step… Start a line with - [ ] for a checklist" value={f.notes ?? ''} onInput={(e) => setF({ ...f, notes: (e.target as HTMLTextAreaElement).value })} />
       <div class="row">
         <label class="field grow"><span>Do by</span><input class="input" type="date" value={f.due_date ?? ''} onInput={(e) => setF({ ...f, due_date: (e.target as HTMLInputElement).value || null })} /></label>
         <label class="field" style="width:42%"><span>Time</span><input class="input" type="time" value={f.due_time?.slice(0, 5) ?? ''} onInput={(e) => setF({ ...f, due_time: (e.target as HTMLInputElement).value || null })} /></label>
