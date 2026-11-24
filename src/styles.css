@@ -443,3 +443,24 @@ a.btn.primary { color: #1d1330; }
 .pos { color: var(--mint); }
 .neg { color: var(--orange); }
 @media (prefers-reduced-motion: reduce) { .mbar i, .cat-bar i { animation: none; } }
+
+/* School */
+.check.sm { width: 22px; height: 22px; margin-top: 0; }
+.due-day { padding: 10px 0 2px; text-transform: uppercase; letter-spacing: .06em; }
+.due-row { display: flex; align-items: center; gap: 10px; padding: 7px 0; font-size: 14.5px; }
+.due-row.done .grow { text-decoration: line-through; opacity: .5; }
+.due-src { width: 22px; height: 22px; border-radius: 7px; display: grid; place-items: center; font-size: 11px; font-weight: 700; color: #1d1330; background: linear-gradient(135deg, #ff9f6b, #ffd66b); flex: none; }
+
+/* Mental: tiles and breathing */
+.tiles.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+button.tile { text-align: left; font: inherit; cursor: pointer; }
+.breathe { display: flex; flex-direction: column; align-items: center; padding-top: 8px; }
+.b-circle { width: 200px; height: 200px; border-radius: 50%; display: grid; place-content: center; text-align: center; gap: 4px;
+  background: radial-gradient(circle at 35% 30%, #c4b5fd, #8fc4ff 55%, #6d5bd0); box-shadow: 0 0 60px #8fc4ff55; color: #1d1330;
+  transform: scale(.62); transition: transform 4s cubic-bezier(.45,0,.55,1), box-shadow 4s; }
+.b-circle span { font-weight: 700; font-size: 17px; }
+.b-circle b { font-size: 28px; font-variant-numeric: tabular-nums; }
+.b-circle.p0, .b-circle.p1 { transform: scale(1); box-shadow: 0 0 90px #c4b5fd88; }
+.b-circle.p2, .b-circle.p3 { transform: scale(.62); }
+.b-circle.still { transform: scale(.85); }
+@media (prefers-reduced-motion: reduce) { .b-circle { transition: none; } }

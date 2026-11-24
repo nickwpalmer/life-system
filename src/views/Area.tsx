@@ -1,13 +1,14 @@
-import { useState } from 'preact/hooks'
+import { useEffect, useState } from 'preact/hooks'
 import { useStore, areaByKey } from '../lib/store'
 import { lastNDays, fmtDay, daysUntil, dayKey } from '../lib/dates'
 import { dailySeries, fmtValue, consistency } from '../lib/metrics'
 import type { Task, Metric } from '../lib/types'
-import { PageHead, Card, Ring } from '../ui/kit'
+import { PageHead, Card, Ring, Sheet } from '../ui/kit'
 import { LineChart, BarChart } from '../ui/charts'
 import { TaskRow, TaskSheet, AddTask, openTask } from './Tasks'
 import { goalProgress } from './Goals'
 import { MoneyPanel } from './Money'
+import { SchoolPanel } from './School'
 
 const avg = (xs: (number | null)[]) => { const v = xs.filter((x): x is number => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null }
 const sum = (xs: (number | null)[]) => xs.reduce<number>((a, b) => a + (b ?? 0), 0)
@@ -36,7 +37,7 @@ function Education({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Task) => void
       const next = ts.filter((t) => t.due_date).sort((a, b) => a.due_date!.localeCompare(b.due_date!))[0]
       return <div class="tile" style="--c:var(--lilac)"><div class="t-name">{c}</div><div class="t-sub">{ts.length} open{next ? ` · next ${fmtDay(next.due_date!).toLowerCase()}` : ''}</div></div>
     })}</div>}
-    <Card title="Deadlines" icon="clock" accent="var(--lilac)">{deadlines.length ? deadlines.map((t) => <TaskRow t={t} onOpen={onOpen} />) : <p class="empty" style="padding:8px">No dated assignments. Add due dates and they show up here.</p>}</Card>
+    <Card title="Task deadlines" icon="tasks" accent="var(--lilac)">{deadlines.length ? deadlines.map((t) => <TaskRow t={t} onOpen={onOpen} />) : <p class="empty" style="padding:8px">No dated assignments. Add due dates and they show up here.</p>}</Card>
   </>
 }
 
@@ -57,6 +58,29 @@ function Finances() {
   </>
 }
 
+const PHASES = ['Breathe in', 'Hold', 'Breathe out', 'Hold'] as const
+
+/** Box breathing, 4-4-4-4, for a minute. Slow exhale steadies the nervous system; the box gives the mind a job. */
+function Breathe({ open, onClose }: { open: boolean; onClose: () => void }) {
+  const [t, setT] = useState(0)
+  useEffect(() => {
+    if (!open) { setT(0); return }
+    const id = window.setInterval(() => setT((n) => n + 1), 1000)
+    return () => window.clearInterval(id)
+  }, [open])
+  const done = t >= 64
+  const phase = PHASES[Math.floor(t / 4) % 4]!
+  return (
+    <Sheet open={open} onClose={onClose} title="One minute">
+      <div class="breathe">
+        <div class={`b-circle p${Math.floor(t / 4) % 4}${done ? ' still' : ''}`}><span>{done ? 'Nice.' : phase}</span><b>{done ? '' : 4 - (t % 4)}</b></div>
+        <p class="muted small" style="text-align:center;margin:18px 0 14px">{done ? 'Four rounds done. Notice one thing that feels a little different.' : `Round ${Math.floor(t / 16) + 1} of 4. In through the nose, out slow.`}</p>
+        <button class="btn block" onClick={() => { done ? onClose() : setT(0) }}>{done ? 'Back' : 'Start over'}</button>
+      </div>
+    </Sheet>
+  )
+}
+
 function Mental() {
   const { metrics, logs, checkins, journal } = useStore((s) => s)
   const days = lastNDays(30)
@@ -67,6 +91,11 @@ function Mental() {
   const since = days[0]
   const jN = journal.filter((j) => dayKey(new Date(j.occurred_at)) >= since).length
   const ciN = checkins.filter((c) => c.day >= since).length
+  const [breathe, setBreathe] = useState(false)
+  const sl = k('sleep_hours') ? dailySeries(k('sleep_hours')!, logs, days) : []
+  const goodSleep = avg(mood.filter((_, i) => (sl[i] ?? 0) >= 7)), shortSleep = avg(mood.filter((v, i) => v != null && sl[i] != null && sl[i]! < 7))
+  const sleepNote = goodSleep != null && shortSleep != null && mood.filter((v) => v != null).length >= 10 && Math.abs(goodSleep - shortSleep) >= 0.5
+    ? `After 7+ hours of sleep your mood averaged ${goodSleep.toFixed(1)}, vs ${shortSleep.toFixed(1)} after shorter nights.` : null
   const withMed = avg(mood.filter((_, i) => (med[i] ?? 0) > 0)), without = avg(mood.filter((v, i) => v != null && !((med[i] ?? 0) > 0)))
   return <>
     <div class="stat-row">
@@ -79,10 +108,14 @@ function Mental() {
       <div class="legend"><span><i class="dot" style="background:#ff8cc8" /> Mood</span><span><i class="dot" style="background:#8fc4ff" /> Anxiety</span></div>
       {withMed != null && without != null && mood.filter((v) => v != null).length >= 10 && <p class="small" style="margin-top:10px">On days you meditated, mood averaged <b>{withMed.toFixed(1)}</b> vs <b>{without.toFixed(1)}</b> on days you didn’t.</p>}
     </Card>
-    <div class="tiles">
+    <div class="tiles three">
+      <button class="tile" style="--c:var(--sky)" onClick={() => setBreathe(true)}><div class="t-name">Breathe</div><div class="t-sub">One minute, guided</div></button>
       <a class="tile" href="#/journal" style="--c:var(--mint)"><div class="t-name">Write</div><div class="t-sub">Get it out of your head</div></a>
       <a class="tile" href="#/checkin/night" style="--c:var(--violet)"><div class="t-name">Night check-in</div><div class="t-sub">Wind down</div></a>
     </div>
+    {sleepNote && <p class="small muted" style="margin:-4px 0 14px">{sleepNote}</p>}
+    <p class="faint tiny" style="margin-bottom:14px">If it ever gets to be too much, you can call or text 988 any time.</p>
+    <Breathe open={breathe} onClose={() => setBreathe(false)} />
   </>
 }
 
@@ -102,6 +135,7 @@ export function AreaView({ areaKey }: { areaKey: string }) {
       <PageHead title={a.name} back="#/more" sub={`${open.length} open · ${doneWeek} done this week`} icon={a.key === 'education' ? 'school' : a.key === 'finances' ? 'wallet' : a.key === 'mental' ? 'brain' : 'layers'} color={a.color ?? undefined} />
       {a.key === 'finances' && <Finances />}
       {a.key === 'mental' && <Mental />}
+      {a.key === 'education' && <SchoolPanel />}
       <div class="grid-2">
         <div>
           {a.key === 'education' && <Education tasks={open} onOpen={setEdit} />}

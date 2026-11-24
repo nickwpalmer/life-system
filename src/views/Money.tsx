@@ -110,7 +110,7 @@ export function MoneyPanel() {
         </Card>}
       </div>
       <div>
-        <Card title="Coming up" icon="calendar" accent="var(--orange)">
+        <Card title="Coming up" icon="cal" accent="var(--orange)">
           {pay?.next_date && <div class="row between small fin-row"><span>{pay.name}</span><span class="pos">{usd(pay.amount ?? 0, true)} · {fmtShort(pay.next_date)}</span></div>}
           {bills.length ? bills.map((b) => <div class="fin-row"><div class="row between small"><span>{b.name}</span><span>{usd(b.amount ?? 0, true)} · {fmtShort(b.next_date!)}</span></div>
             {stale(b) && <div class="faint tiny">Monarch last saw this {fmtShort(b.last_paid!)}. Still real?</div>}</div>) : <p class="muted small">No bills in the next 30 days.</p>}
