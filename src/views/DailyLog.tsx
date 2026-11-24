@@ -94,10 +94,29 @@ export function TimedLogSheet({ m, day, onClose }: { m: Metric | null; day: stri
   )
 }
 
+/**
+ * Numbers that arrive on their own (Apple Health, spending from Monarch) show as read-only tiles.
+ * "Fix a number" opens the usual rows for when a sync is missing or wrong.
+ */
+const SYNCED = new Set(['sleep_score', 'hrv', 'resting_hr', 'steps'])
+export const isSynced = (m: Metric) => SYNCED.has(m.key) || m.unit === '$'
+function SyncedTiles({ ms, day, color, from, onTimed }: { ms: Metric[]; day: string; color: string; from: string; onTimed: (m: Metric) => void }) {
+  const logs = useStore((s) => s.logs)
+  const [edit, setEdit] = useState(false)
+  return (
+    <div class="synced" style={`--c:${color}`}>
+      <div class="htiles">{ms.map((m) => { const v = dailySeries(m, logs, [day])[0]; return (
+        <div class="htile"><b class={v == null ? 'none' : ''}>{v == null ? '–' : m.unit === '$' ? `$${Math.round(v)}` : m.key === 'steps' ? Math.round(v).toLocaleString() : fmtValue(m, v)}</b><span>{m.name}</span></div>
+      ) })}</div>
+      <div class="row between tiny faint" style="margin-top:6px"><span>From {from}</span><button class="faint tiny" onClick={() => setEdit(!edit)}>{edit ? 'Done' : 'Fix a number'}</button></div>
+      {edit && ms.map((m) => <LogRow m={m} day={day} onTimed={onTimed} />)}
+    </div>
+  )
+}
+
 /** Trackers grouped as in the daily log. `only` limits to some groups (the night check-in uses this). */
 export function LogGroups({ day, only, compact }: { day: string; only?: string[]; compact?: boolean }) {
   const metrics = useStore((s) => s.metrics.filter((m) => m.active).sort((a, b) => a.sort - b.sort))
-  const logs = useStore((s) => s.logs)
   const [timed, setTimed] = useState<Metric | null>(null)
   const groups = LOG_GROUPS.filter((g) => !only || only.includes(g.key))
   return (
@@ -105,13 +124,13 @@ export function LogGroups({ day, only, compact }: { day: string; only?: string[]
       {groups.map((g) => {
         const ms = metrics.filter((m) => groupOf(m) === g.key)
         if (!ms.length) return null
-        const body = ms.map((m) => <LogRow m={m} day={day} onTimed={setTimed} />)
-        const open = g.key === 'vices' ? ms.filter((m) => m.kind === 'count' && dailySeries(m, logs, [day])[0] == null) : []
-        const clear = open.length > 0 && (
-          <button class="chip small" style="margin-left:auto" onClick={() => { haptic(); open.forEach((m) => setDaily(m, day, 0)); toast(`Logged none for ${open.length === ms.filter((m) => m.kind === 'count').length ? 'all vices' : open.map((m) => m.name.toLowerCase()).join(', ')}`) }}>
-            <Icon name="check" size={14} /> None {day === today() ? 'today' : 'that day'}
-          </button>
-        )
+        const synced = ms.filter(isSynced), manual = ms.filter((m) => !isSynced(m))
+        const body = <>
+          {manual.map((m) => <LogRow m={m} day={day} onTimed={setTimed} />)}
+          {synced.length > 0 && !compact && <SyncedTiles ms={synced} day={day} color={g.color} from={g.key === 'money' ? 'Monarch' : 'Apple Health'} onTimed={setTimed} />}
+        </>
+        if (compact && !manual.length) return null
+        const clear = g.key === 'money' && !compact ? <a class="faint small" style="margin-left:auto" href="#/money">Money</a> : null
         return compact ? <div class="log-group"><div class="group-h row" style={`color:${g.color}`}>{g.label}{clear}</div>{body}</div>
           : <section class="card log-group" style={`--accent:${g.color}`}><div class="card-h"><h2 style={`color:${g.color}`}>{g.label}</h2>{clear}</div>{body}</section>
       })}
@@ -125,7 +144,8 @@ export function DailyLog({ day }: { day: string }) {
   const logs = useStore((s) => s.logs)
   const isToday = day === today()
   const go = (n: number) => { location.hash = `#/log/${dayKey(addDays(fromKey(day), n))}` }
-  const filled = metrics.filter((m) => dailySeries(m, logs, [day])[0] != null).length
+  const mine = metrics.filter((m) => !isSynced(m))
+  const filled = mine.filter((m) => dailySeries(m, logs, [day])[0] != null).length
   const days = lastNDays(14)
   const slipping = metrics.filter((m) => m.role === 'habit' && consistency(dailySeries(m, logs, days)).lastTwoMissed)
   return (
@@ -133,16 +153,16 @@ export function DailyLog({ day }: { day: string }) {
       <PageHead title="Daily log" sub="Fill it in once, whenever suits you. Add a time only if it matters." icon="sliders" color="var(--pink)" />
       <div class="daybar">
         <button class="icon-btn" aria-label="Previous day" onClick={() => go(-1)}><Icon name="back" size={20} /></button>
-        <div class="d-label"><b>{fmtDay(day)}</b><span class="faint small">{fromKey(day).toLocaleDateString([], { month: 'long', day: 'numeric' })} · {filled}/{metrics.length} logged</span></div>
+        <div class="d-label"><b>{fmtDay(day)}</b><span class="faint small">{fromKey(day).toLocaleDateString([], { month: 'long', day: 'numeric' })} · {filled}/{mine.length} logged</span></div>
         <button class="icon-btn" aria-label="Next day" disabled={isToday} style={isToday ? 'opacity:.3' : ''} onClick={() => go(1)}><Icon name="chev" size={20} /></button>
       </div>
-      <div class="progress" style="margin:-4px 4px 16px"><i style={`width:${metrics.length ? (filled / metrics.length) * 100 : 0}%`} /></div>
+      <div class="progress" style="margin:-4px 4px 16px"><i style={`width:${mine.length ? (filled / mine.length) * 100 : 0}%`} /></div>
       {isToday && slipping.length > 0 && (
         <div class="card soft flat small" style="padding:12px 14px">
           <b>Don’t miss twice:</b> {slipping.map((m) => m.name.toLowerCase()).join(', ')} missed yesterday. A tiny version today keeps the habit alive.
         </div>
       )}
-      <div class="grid-2"><div><LogGroups day={day} only={['mind', 'body']} /></div><div><LogGroups day={day} only={['habits', 'vices', 'money', 'other']} /></div></div>
+      <div class="grid-2"><div><LogGroups day={day} only={['mind', 'body']} /></div><div><LogGroups day={day} only={['habits', 'money', 'other']} /></div></div>
       <p class="faint small" style="text-align:center;margin:4px 0 20px">Skip anything you don’t feel like logging. If a tracker never earns its place, <a class="link" href="#/settings">turn it off</a>.</p>
       <p class="faint small" style="text-align:center">Saves as you go. Changes sync in under a second.</p>
     </>

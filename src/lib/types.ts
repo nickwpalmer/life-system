@@ -58,6 +58,7 @@ export type Goal = {
 export type Person = {
   id: string; name: string; relation: string | null; birthday: string | null
   contact_every_days: number | null; last_contact: string | null; notes: string | null
+  phone?: string | null; email?: string | null; org?: string | null
 }
 
 export type Review = {

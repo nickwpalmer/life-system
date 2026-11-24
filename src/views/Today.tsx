@@ -1,38 +1,14 @@
 import { useState } from 'preact/hooks'
-import { useStore, setState, metricByKey, toast } from '../lib/store'
+import { useStore } from '../lib/store'
 import { today, fmtLongDate, partOfDay, fmtTime, daysUntil, daysBetween, fmtDay, weekStart, dayKey, relTime, fromKey, fmtShort } from '../lib/dates'
 import { eventDay, calColor, nextBirthday } from '../lib/cal'
-import { addTimedLog } from '../lib/db'
 import { usePrefs, phaseNow } from '../lib/prefs'
 import { Icon } from '../ui/icons'
-import { Card, haptic } from '../ui/kit'
+import { Card } from '../ui/kit'
 import { openTask } from './Tasks'
 import { useKeyDates } from './School'
-import { SubstanceQuick } from './Substances'
 import { useRows } from '../lib/rows'
 import type { Rec } from './Records'
-
-/** Mood right now: five taps, saved as a timed mood entry (1 to 10 scale). */
-export const MOODS: [number, string, string][] = [[2, 'Rough', '#8fc4ff'], [4, 'Low', '#a98bff'], [6, 'Okay', '#cdb9ff'], [8, 'Good', '#ffc08a'], [10, 'Great', '#ffa463']]
-
-export function MoodTap({ onDone }: { onDone?: () => void }) {
-  const [picked, setPicked] = useState<number | null>(null)
-  const log = async (v: number) => {
-    const m = metricByKey('mood')
-    if (!m) { toast('Add a Mood tracker in Settings first'); return }
-    haptic(); setPicked(v)
-    try { await addTimedLog(m.id, v, null, null, new Date().toISOString()); toast(`Mood logged at ${fmtTime(new Date().toISOString())}`); onDone?.() } catch { setPicked(null) }
-  }
-  return (
-    <div class="moods" role="group" aria-label="Mood right now">
-      {MOODS.map(([v, l, c]) => (
-        <button class={`mood ${picked === v ? 'on' : ''}`} style={`--c:${c}`} onClick={() => log(v)} aria-pressed={picked === v}>
-          <i style={`--s:${0.55 + v / 25}`} /><span>{l}</span>
-        </button>
-      ))}
-    </div>
-  )
-}
 
 function Intention() {
   const m = useStore((s) => s.checkins.find((c) => c.kind === 'morning' && c.day === today()))
@@ -45,7 +21,7 @@ function Intention() {
   )
 }
 
-/** The big card at the top. What it is depends on the time of day (set in Settings). */
+/** The big card at the top: a check-in when one is due, otherwise nothing (the + button holds quick logging). */
 function Hero() {
   const prefs = usePrefs()
   const checkins = useStore((s) => s.checkins)
@@ -55,32 +31,75 @@ function Hero() {
   const nightDay = new Date().getHours() < 12 ? dayKey(new Date(Date.now() - 864e5)) : t
   const morningDone = checkins.some((c) => c.kind === 'morning' && c.day === t)
   const nightDone = checkins.some((c) => c.kind === 'night' && c.day === nightDay)
-
   if (phase === 'morning' && !morningDone) return (
     <a class="hero morning" href="#/checkin/morning">
       <span class="h-orb"><Icon name="sun" size={30} /></span>
-      <span class="grow"><span class="h-k">Morning check-in</span><h2>How did you sleep?</h2><span class="h-s">Sleep, mood and your top three. About a minute.</span></span>
+      <span class="grow"><span class="h-k">Morning check-in</span><h2>How did you sleep?</h2><span class="h-s">One question at a time. About a minute.</span></span>
       <Icon name="chev" />
     </a>
   )
   if (phase === 'night' && !nightDone) return (
     <a class="hero night" href="#/checkin/night">
       <span class="h-orb"><Icon name="moon" size={28} /></span>
-      <span class="grow"><span class="h-k">Night check-in</span><h2>How was today?</h2><span class="h-s">Log the day, one win, and wind down.</span></span>
+      <span class="grow"><span class="h-k">Night check-in</span><h2>How was today?</h2><span class="h-s">A few taps, one win, and wind down.</span></span>
       <Icon name="chev" />
     </a>
   )
+  return <Intention />
+}
+
+/** Morning, night and weekly review in one row, with what's done. */
+function Rituals() {
+  const checkins = useStore((s) => s.checkins)
+  const reviews = useStore((s) => s.reviews)
+  const t = today()
+  const nightDay = new Date().getHours() < 12 ? dayKey(new Date(Date.now() - 864e5)) : t
+  const ws = dayKey(weekStart())
+  const lastWs = dayKey(weekStart(new Date(Date.now() - 7 * 864e5)))
+  const items: [string, string, string, boolean, string][] = [
+    ['#/checkin/morning', 'sun', 'Morning', checkins.some((c) => c.kind === 'morning' && c.day === t), 'var(--orange)'],
+    ['#/checkin/night', 'moon', 'Night', checkins.some((c) => c.kind === 'night' && c.day === nightDay), 'var(--violet)'],
+    ['#/review', 'review', 'Week', reviews.some((r) => r.week_start === ws || r.week_start === lastWs), 'var(--lilac)'],
+  ]
   return (
-    <section class="hero log">
-      <div class="row between"><span class="h-k">{phase === 'night' ? 'Day wrapped. Anything else?' : 'Quick log'}</span><a class="link small" href={`#/log/${t}`}>Daily log</a></div>
-      <h2 style="margin:4px 0 12px">How are you right now?</h2>
-      <MoodTap />
-      <div class="quick">
-        <SubstanceQuick />
-        <button class="qbtn" style="--c:var(--mint)" onClick={() => setState({ capture: 'journal' })}><Icon name="book" size={18} />Note to self</button>
-        <a class="qbtn" style="--c:var(--pink)" href={`#/log/${t}`}><Icon name="sliders" size={18} />Log the day</a>
-      </div>
-      <Intention />
+    <div class="rituals">
+      {items.map(([href, ic, l, done, c]) => <a href={href} class={`ritual ${done ? 'done' : ''}`} style={`--c:${c}`}><Icon name={done ? 'check' : ic} size={17} />{l}</a>)}
+    </div>
+  )
+}
+
+/** Today at a glance: the numbers worth seeing without opening anything. */
+function Dash() {
+  const metrics = useStore((s) => s.metrics)
+  const logs = useStore((s) => s.logs)
+  const tasks = useStore((s) => s.tasks)
+  const subs = useRows<{ occurred_at: string }>('substance_logs')
+  const t = today()
+  const id = (k: string) => metrics.find((m) => m.key === k)?.id
+  const of = (k: string) => logs.filter((l) => l.metric_id === id(k) && l.value_num != null)
+  const onDay = (k: string, d: string) => of(k).filter((l) => dayKey(new Date(l.occurred_at)) === d).sort((a, b) => b.occurred_at.localeCompare(a.occurred_at))[0]?.value_num ?? null
+  const todayTimed = (k: string) => of(k).filter((l) => dayKey(new Date(l.occurred_at)) === t).sort((a, b) => a.occurred_at.localeCompare(b.occurred_at))
+  const week = Array.from({ length: 7 }, (_, i) => dayKey(new Date(Date.now() - (6 - i) * 864e5)))
+  const avg = (k: string, d: string) => { const v = of(k).filter((l) => dayKey(new Date(l.occurred_at)) === d).map((l) => l.value_num!); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null }
+  const mood = todayTimed('mood'), stress = todayTimed('anxiety')
+  const sleep = onDay('sleep_hours', t) ?? onDay('sleep_hours', dayKey(new Date(Date.now() - 864e5)))
+  const steps = onDay('steps', t)
+  const due = tasks.filter((x) => openTask(x) && x.status !== 'inbox' && (x.due_date === t || x.scheduled_for === t)).length
+  const done = tasks.filter((x) => x.status === 'done' && x.completed_at && dayKey(new Date(x.completed_at)) === t).length
+  const subN = (subs ?? []).filter((r) => dayKey(new Date(r.occurred_at)) === t).length
+  const spark = (k: string, max = 10) => <span class="spark">{week.map((d) => { const v = avg(k, d); return <i style={`height:${v == null ? 6 : 10 + (v / max) * 90}%;${v == null ? 'opacity:.25' : ''}`} /> })}</span>
+  const last = (l: typeof mood) => l.length ? l[l.length - 1] : null
+  const tile = (href: string, c: string, label: string, val: string, sub: string, extra?: preact.ComponentChildren) => (
+    <a class="dtile" href={href} style={`--c:${c}`}><span class="d-l">{label}</span><b>{val}</b><span class="d-s">{sub}</span>{extra}</a>
+  )
+  return (
+    <section class="dash">
+      {tile(`#/log/${t}`, 'var(--orange)', 'Mood', last(mood) ? String(last(mood)!.value_num) : '–', last(mood) ? `${mood.length}× today · ${fmtTime(last(mood)!.occurred_at)}` : 'Tap + to log', spark('mood'))}
+      {tile(`#/log/${t}`, 'var(--coral)', 'Stress', last(stress) ? String(last(stress)!.value_num) : '–', last(stress) ? `last at ${fmtTime(last(stress)!.occurred_at)}` : 'Not logged', spark('anxiety'))}
+      {tile('#/health', 'var(--sky)', 'Sleep', sleep != null ? `${Math.round(sleep * 10) / 10}h` : '–', sleep != null ? 'last night' : 'Waiting on Health', spark('sleep_hours', 10))}
+      {tile('#/health', 'var(--mint)', 'Steps', steps != null ? steps.toLocaleString() : '–', steps != null ? 'today' : 'Waiting on Health')}
+      {tile('#/tasks', 'var(--violet)', 'Tasks', `${done}/${done + due}`, 'done today', <span class="dbar"><i style={`width:${done + due ? (done / (done + due)) * 100 : 0}%`} /></span>)}
+      {tile('#/substances', 'var(--gold)', 'Substances', String(subN), 'logged today')}
     </section>
   )
 }
@@ -189,6 +208,8 @@ function ComingUp() {
   const areas = useStore((s) => s.areas)
   const [kd] = useKeyDates()
   const recs = useRows<Rec>('records')
+  const [far, setFar] = useState(false)
+  const [all, setAll] = useState(false)
   type Item = { d: string; title: string; c: string; href: string }
   const items: Item[] = []
   for (const t of tasks) if (openTask(t) && t.due_date && daysUntil(t.due_date) > 1 && daysUntil(t.due_date) <= 14 && t.priority >= 3) items.push({ d: t.due_date, title: t.title, c: areas.find((a) => a.id === t.area_id)?.color ?? 'var(--violet)', href: '#/tasks' })
@@ -196,14 +217,15 @@ function ComingUp() {
   for (const g of goals) if (g.status === 'active' && !g.suggested && g.target_date && daysUntil(g.target_date) >= 0 && daysUntil(g.target_date) <= 30) items.push({ d: g.target_date, title: g.title, c: 'var(--gold)', href: '#/goals' })
   for (const k of kd ?? []) if (!k.done && (k.kind === 'exam' || k.kind === 'term') && daysUntil(k.day) > 0 && daysUntil(k.day) <= 21) items.push({ d: k.day, title: k.course ? `${k.course}: ${k.title}` : k.title, c: k.kind === 'exam' ? 'var(--pink)' : 'var(--lilac)', href: '#/school' })
   for (const r of recs ?? []) if (r.expires_on && daysUntil(r.expires_on) >= 0 && daysUntil(r.expires_on) <= 45) items.push({ d: r.expires_on, title: `${r.name} ${r.renews ? 'renews' : 'ends'}`, c: daysUntil(r.expires_on) <= 30 ? 'var(--gold)' : 'var(--peach)', href: '#/records' })
-  items.sort((a, b) => a.d.localeCompare(b.d))
+  items.sort((a, b) => far ? b.d.localeCompare(a.d) : a.d.localeCompare(b.d))
   if (!items.length) return null
   return (
-    <Card title="Coming up" icon="flame" accent="var(--gold)">
-      {items.slice(0, 4).map((i) => {
+    <Card title="Coming up" icon="flame" accent="var(--gold)" action={<button class="faint small" onClick={() => setFar(!far)}>{far ? 'Furthest first' : 'Soonest first'}</button>}>
+      {(all ? items : items.slice(0, 4)).map((i) => {
         const n = daysUntil(i.d)
-        return <a class="count" href={i.href} style={`--c:${i.c};color:inherit;text-decoration:none`}><span class="c-n"><b>{n}</b><span>{n === 1 ? 'day' : 'days'}</span></span><span class="grow"><div class="ellipsis">{i.title}</div><div class="faint small">{fmtDay(i.d)}</div></span></a>
+        return <a class="count" href={i.href} style={`--c:${i.c};color:inherit;text-decoration:none`}><span class="c-n"><b>{n}</b><span>{n === 1 ? 'day' : 'days'}</span></span><span class="grow" style="min-width:0"><div class="ellipsis">{i.title}</div><div class="faint small">{fmtDay(i.d)}</div></span></a>
       })}
+      {items.length > 4 && <button class="faint small" style="margin-top:6px" onClick={() => setAll(!all)}>{all ? 'Show less' : `Show all ${items.length}`}</button>}
     </Card>
   )
 }
@@ -219,6 +241,8 @@ export function Today() {
         <h1>{greet}, <span class="grad-text">{name}</span></h1>
       </header>
       <Hero />
+      <Rituals />
+      <Dash />
       <TaskGlance />
       <NextUp />
       <Gaps />

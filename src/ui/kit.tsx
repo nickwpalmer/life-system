@@ -1,6 +1,6 @@
 import { createPortal } from 'preact/compat'
 import type { ComponentChildren } from 'preact'
-import { useEffect, useState } from 'preact/hooks'
+import { useEffect, useState, useRef } from 'preact/hooks'
 import { useStore, setState } from '../lib/store'
 import { Icon } from './icons'
 
@@ -18,12 +18,30 @@ export function Sheet({ open, onClose, children, title, wide }: { open: boolean;
     addEventListener('keydown', f); document.body.classList.add('noscroll')
     return () => { removeEventListener('keydown', f); document.body.classList.remove('noscroll') }
   }, [open])
+  // Swipe down from the top of the sheet to close it, like a native sheet.
+  const drag = useRef<{ y: number; dy: number; el: HTMLElement } | null>(null)
+  const onTouchStart = (e: TouchEvent) => {
+    const el = e.currentTarget as HTMLElement
+    const t = e.target as HTMLElement
+    if (el.scrollTop > 0 || (t.closest('textarea, input[type=range], .no-swipe') && !t.closest('.grabber, .sheet-h'))) return
+    drag.current = { y: e.touches[0].clientY, dy: 0, el }
+  }
+  const onTouchMove = (e: TouchEvent) => {
+    const d = drag.current; if (!d) return
+    d.dy = Math.max(0, e.touches[0].clientY - d.y)
+    d.el.style.transition = 'none'; d.el.style.transform = `translateY(${d.dy}px)`
+  }
+  const onTouchEnd = () => {
+    const d = drag.current; drag.current = null; if (!d) return
+    d.el.style.transition = ''; d.el.style.transform = ''
+    if (d.dy > 110) onClose()
+  }
   if (!shown) return null
   // Portal to <body>: an animated ancestor (the page-enter transform) would otherwise trap position:fixed.
   return createPortal(
     <>
       <div class={`scrim ${leaving ? 'out' : ''}`} onClick={onClose} />
-      <div class={`sheet ${wide ? 'wide' : ''} ${leaving ? 'out' : ''}`} role="dialog" aria-modal="true">
+      <div class={`sheet ${wide ? 'wide' : ''} ${leaving ? 'out' : ''}`} role="dialog" aria-modal="true" onTouchStart={onTouchStart} onTouchMove={onTouchMove} onTouchEnd={onTouchEnd}>
         <div class="grabber" />
         {title && <div class="sheet-h"><h2>{title}</h2><button class="icon-btn sm" aria-label="Close" onClick={onClose}><Icon name="x" size={18} /></button></div>}
         {children}
@@ -158,4 +176,18 @@ export function Card({ title, action, children, class: cls = '', accent, icon }:
 
 export function AreaDot({ color }: { color: string | null | undefined }) {
   return <i class="dot" style={`background:${color ?? 'var(--faint)'}`} />
+}
+
+/** A small "sort by" button that cycles through options. The choice is remembered per list on this device. */
+export function useSort<K extends string>(id: string, first: K): [K, (k: K) => void] {
+  const [k, setK] = useState<K>(() => { try { return (localStorage.getItem(`sort-${id}`) as K) || first } catch { return first } })
+  return [k, (n: K) => { setK(n); try { localStorage.setItem(`sort-${id}`, n) } catch { /* private mode */ } }]
+}
+export function SortBtn<K extends string>({ value, options, onChange }: { value: K; options: [K, string][]; onChange: (k: K) => void }) {
+  const i = Math.max(0, options.findIndex(([k]) => k === value))
+  return (
+    <button class="sortbtn" onClick={() => onChange(options[(i + 1) % options.length][0])} aria-label="Change sort order">
+      <Icon name="sort" size={14} />{options[i][1]}
+    </button>
+  )
 }

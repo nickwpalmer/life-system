@@ -1,13 +1,14 @@
 import { useState } from 'preact/hooks'
 import { useStore } from '../lib/store'
 import { lastNDays } from '../lib/dates'
-import { dailySeries, fmtValue, consistency, streak } from '../lib/metrics'
+import { dailySeries, consistency, streak } from '../lib/metrics'
 import type { Metric } from '../lib/types'
 import { Icon } from '../ui/icons'
 import { PageHead, Card } from '../ui/kit'
-import { LineChart, BarChart, Heat } from '../ui/charts'
+import { LineChart, BarChart } from '../ui/charts'
 import { fmtShort } from '../lib/dates'
 import type { Review } from '../lib/types'
+import { useRows, registerDemo } from '../lib/rows'
 
 const avg = (xs: (number | null)[]) => { const v = xs.filter((x): x is number => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null }
 
@@ -33,7 +34,6 @@ export function Insights() {
   const k = (key: string) => metrics.find((m) => m.key === key)
   const S = (key: string) => (k(key) ? dailySeries(k(key)!, logs, days) : days.map(() => null))
   const mood = S('mood'), anx = S('anxiety'), energy = S('energy'), sleep = S('sleep_hours')
-  const shift = (xs: (number | null)[]) => [null, ...xs.slice(0, -1)] // yesterday's value lined up with today
 
   const findings: Finding[] = []
   const rel = (label: string, a: (number | null)[], b: (number | null)[], pos: string, neg: string, icon: string, c: string) => {
@@ -45,11 +45,8 @@ export function Insights() {
   rel('Sleep and mood', sleep, mood, 'More sleep goes with a better mood the same day.', 'Oddly, more sleep goes with lower mood. Worth watching.', 'moon', 'var(--sky)')
   rel('Caffeine and anxiety', S('caffeine'), anx, 'More caffeine goes with more anxiety.', 'More caffeine goes with less anxiety for you.', 'bolt', 'var(--orange)')
   rel('Exercise and mood', S('exercise'), mood, 'Exercise days go with a better mood.', 'Exercise days go with lower mood. Maybe it’s timing.', 'heart', 'var(--mint)')
-  rel('Alcohol and next-day mood', shift(S('alcohol')), mood, 'Drinking goes with a better mood the next day.', 'Drinking goes with a lower mood the next day.', 'pulse', 'var(--coral)')
-  rel('Screen time and mood', S('screen_time'), mood, 'More screen time goes with a better mood.', 'More screen time goes with a lower mood.', 'grid', 'var(--violet)')
 
   const habits = metrics.filter((m) => m.role === 'habit')
-  const vices = metrics.filter((m) => m.role === 'vice')
   const ciDays = new Set(checkins.map((c) => c.day))
   const ciRate = days.filter((d) => ciDays.has(d)).length
   const anyData = mood.some((v) => v != null) || sleep.some((v) => v != null)
@@ -93,19 +90,54 @@ export function Insights() {
         </div>
         <div>
           <Card title="Habits" icon="flame" accent="var(--violet)">{habits.length ? habits.map(habitLine) : <p class="muted small">No habits set up.</p>}</Card>
-          <Card title="Vices" icon="pulse" accent="var(--coral)">
-            {vices.map((m) => { const s = dailySeries(m, logs, days); const a = avg(s); const free = s.filter((v) => !v).length; return (
-              <div class="metric-row"><div class="row between small" style="margin-bottom:8px"><span>{m.name}</span><span class="faint">{free} free day{free === 1 ? "" : "s"}{a != null ? ` · avg ${fmtValue(m, a)}` : ''}</span></div><Heat values={s.slice(-28)} color="#ff8a7a" /></div>
-            ) })}
-          </Card>
         </div>
       </div>
+      <AiReports />
       <Reviews />
     </>
   )
 }
 
 /** Every weekly review, newest first, with how the weeks have felt over time. */
+type Report = { id: string; title: string; period_start: string | null; period_end: string | null; body: string; author: string; created_at: string }
+registerDemo('reports', () => [{ id: 'rp1', title: 'Your week, read by Claude', period_start: null, period_end: null, author: 'claude', created_at: new Date().toISOString(),
+  body: '## What stood out\n- Mood was steadier on days you exercised.\n- Sleep dipped midweek, and stress rose the next day.\n\n## One thing to try\nProtect one evening for winding down before your busiest day.' }] as never)
+
+/** Plain text with ## headings and - bullets, drawn as elements (never as raw HTML). */
+function Prose({ text }: { text: string }) {
+  const out: preact.ComponentChildren[] = []
+  let list: string[] = []
+  const flush = () => { if (list.length) { out.push(<ul class="prose-ul">{list.map((l) => <li>{l}</li>)}</ul>); list = [] } }
+  for (const raw of text.split('\n')) {
+    const l = raw.trim()
+    if (/^[-*•]\s+/.test(l)) { list.push(l.replace(/^[-*•]\s+/, '').replace(/\*\*/g, '')); continue }
+    flush()
+    if (!l) continue
+    if (/^#{1,4}\s+/.test(l)) out.push(<h3 class="prose-h">{l.replace(/^#+\s+/, '')}</h3>)
+    else out.push(<p class="prose-p">{l.replace(/\*\*/g, '')}</p>)
+  }
+  flush()
+  return <div class="prose">{out}</div>
+}
+
+/** Claude's longer read of your data, about once a week. Claude writes these into the reports table. */
+function AiReports() {
+  const rows = useRows<Report>('reports')
+  const [open, setOpen] = useState<string | null>(null)
+  const list = [...(rows ?? [])].sort((a, b) => b.created_at.localeCompare(a.created_at))
+  const cur = list.find((r) => r.id === open) ?? list[0]
+  const when = (r: Report) => r.period_start && r.period_end ? `${fmtShort(r.period_start)} to ${fmtShort(r.period_end)}` : fmtShort(r.created_at.slice(0, 10))
+  return (
+    <Card title="AI analysis" icon="sparkle" accent="var(--teal)">
+      {!cur ? <p class="muted small">Claude’s full read of your data lands here, about once a week: patterns across mood, sleep, school, money and your journal, and one or two things to try.</p> : <>
+        <div class="row between" style="margin-bottom:6px"><b>{cur.title}</b><span class="faint small">{when(cur)}</span></div>
+        <Prose text={cur.body} />
+        {list.length > 1 && <div class="chips" style="margin-top:10px">{list.slice(0, 8).map((r) => <button class={`chip small ${r.id === cur.id ? 'on' : ''}`} onClick={() => setOpen(r.id)}>{when(r)}</button>)}</div>}
+      </>}
+    </Card>
+  )
+}
+
 function Reviews() {
   const reviews = useStore((s) => [...s.reviews].sort((a, b) => b.week_start.localeCompare(a.week_start)))
   const [open, setOpen] = useState<string | null>(null)

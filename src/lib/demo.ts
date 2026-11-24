@@ -26,7 +26,7 @@ export function demoData(): Data {
     ['nicotine', 'Nicotine', 'count', null, 'vice', 'health'], ['cannabis', 'Cannabis', 'count', null, 'vice', 'health'], ['screen_time', 'Screen time', 'duration', 'h', 'vice', 'mental'],
     ['spend', 'Spending', 'number', '$', 'track', 'finances'],
   ]
-  const metrics: Metric[] = mDefs.map(([key, name, kind, unit, role, ar], i) => ({ id: id(), key, name, kind, unit, role, area_id: A(ar), target: null, target_period: null, higher_is_better: role !== 'vice', icon: null, sort: i, active: true, show_today: true }))
+  const metrics: Metric[] = mDefs.map(([key, name, kind, unit, role, ar], i) => ({ id: id(), key, name, kind, unit, role, area_id: A(ar), target: null, target_period: null, higher_is_better: role !== 'vice', icon: null, sort: i, active: role !== 'vice', show_today: true }))
   const M = (k: string) => metrics.find((m) => m.key === k)!.id
   const logs: Log[] = []
   const days = lastNDays(45).slice(0, -1)

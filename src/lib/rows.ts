@@ -6,7 +6,7 @@ import { getState, toast } from './store'
  * Tables that aren't in the one-shot bootstrap load on the screens that need them.
  * One shared cache per table, so every screen sees the same rows and writes update everywhere at once.
  */
-export type RowTable = 'substance_logs' | 'courses' | 'degree_reqs' | 'scholarships' | 'change_log' | 'key_dates' | 'edu_schools' | 'edu_courses' | 'records'
+export type RowTable = 'substance_logs' | 'courses' | 'degree_reqs' | 'scholarships' | 'change_log' | 'key_dates' | 'edu_schools' | 'edu_courses' | 'records' | 'claude_inbox' | 'grade_logs' | 'reports' | 'inventory_items'
 type Row = { id: string | number } & Record<string, unknown>
 const cache = new Map<RowTable, Row[]>()
 const loading = new Map<RowTable, Promise<void>>()
@@ -16,6 +16,7 @@ const ORDER: Record<RowTable, [string, boolean]> = {
   substance_logs: ['occurred_at', false], courses: ['sort', true], degree_reqs: ['sort', true],
   scholarships: ['deadline', true], change_log: ['at', false], key_dates: ['day', true],
   edu_schools: ['sort', true], edu_courses: ['term_order', true], records: ['name', true],
+  claude_inbox: ['created_at', false], grade_logs: ['logged_at', true], reports: ['created_at', false], inventory_items: ['name', true],
 }
 
 export function registerDemo(t: RowTable, f: () => Row[]) { demoRows.set(t, f) }
@@ -30,7 +31,8 @@ export function loadRows(t: RowTable, force = false) {
     if (getState().demo) { set(t, demoRows.get(t)?.() ?? []); return }
     const [col, asc] = ORDER[t]
     let q = supabase.from(t).select('*').order(col, { ascending: asc, nullsFirst: false })
-    if (t === 'change_log') q = q.limit(300)
+    if (t === 'change_log') q = q.limit(200)
+    if (t === 'claude_inbox') q = q.limit(100)
     if (t === 'substance_logs') q = q.limit(2000)
     const { data, error } = await q
     if (error) { toast(`Couldn’t load: ${error.message}`); set(t, []); return }
@@ -77,3 +79,6 @@ export async function dropRow(t: RowTable, id: string | number) {
   const { error } = await supabase.from(t).delete().eq('id', id)
   if (error) { set(t, prev); toast(`Couldn’t delete: ${error.message}`); throw error }
 }
+
+/** Reloads every table a screen has opened, so the app matches the database. */
+export function reloadAll() { return Promise.all([...cache.keys()].map((t) => loadRows(t, true))) }

@@ -64,7 +64,7 @@ export function presets(m: Metric): number[] {
 }
 
 export const ROLE_LABEL: Record<string, string> = {
-  habit: 'Habits', vice: 'Vices', health: 'Body', track: 'Tracking',
+  habit: 'Habits', vice: 'Other', health: 'Body', track: 'Tracking',
 }
 
 /** Day total for one tracker on one day. */
@@ -83,7 +83,6 @@ export const LOG_GROUPS: { key: string; label: string; color: string; test: (m: 
   { key: 'mind', label: 'Mind', color: 'var(--pink)', test: (m) => m.kind === 'scale' },
   { key: 'body', label: 'Body', color: 'var(--mint)', test: (m) => m.role === 'health' },
   { key: 'habits', label: 'Habits', color: 'var(--violet)', test: (m) => m.role === 'habit' },
-  { key: 'vices', label: 'Vices', color: 'var(--coral)', test: (m) => m.role === 'vice' },
   { key: 'money', label: 'Money', color: 'var(--gold)', test: (m) => m.unit === '$' },
   { key: 'other', label: 'Other', color: 'var(--sky)', test: () => true },
 ]

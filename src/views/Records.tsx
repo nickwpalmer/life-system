@@ -2,7 +2,7 @@ import { useEffect, useState } from 'preact/hooks'
 import { useRows, addRow, patchRow, dropRow, registerDemo } from '../lib/rows'
 import { toast } from '../lib/store'
 import { daysUntil, fmtShort, fromKey, inDays } from '../lib/dates'
-import { usePrefs, savePrefs } from '../lib/prefs'
+import { Inventories } from './Inventory'
 import { Icon } from '../ui/icons'
 import { Sheet, PageHead, Switch, haptic } from '../ui/kit'
 
@@ -141,25 +141,8 @@ export function RecCard({ r, onOpen, preview }: { r: Rec; onOpen?: () => void; p
   )
 }
 
-/** Sample for the preview in Settings: the same health insurance card active, close to ending and expired. */
-function Preview() {
-  const base: Rec = { id: 'p', name: 'Health insurance', category: 'insurance', issuer: 'Your insurer', details: 'Plan and member number go here.', location: 'Card in wallet', link: null, login_hint: null, expires_on: null, renews: false, notes: null, pinned: false }
-  return (
-    <section class="card preview-box">
-      <div class="card-h"><h2>Expiry preview</h2><button class="btn ghost sm" onClick={() => savePrefs({ previewExpiry: false })}>Turn off</button></div>
-      <p class="faint small" style="margin-bottom:12px">Sample only, not your data. This is how a record looks as its date gets close and after it passes.</p>
-      <div class="rec-grid">
-        <RecCard r={{ ...base, id: 'p1', expires_on: inDays(120) }} preview="Active" />
-        <RecCard r={{ ...base, id: 'p2', expires_on: inDays(9) }} preview="Ending soon" />
-        <RecCard r={{ ...base, id: 'p3', expires_on: inDays(-6) }} preview="Expired" />
-      </div>
-    </section>
-  )
-}
-
 export function Records() {
   const rows = useRows<Rec>('records')
-  const prefs = usePrefs()
   const [q, setQ] = useState('')
   const [cat, setCat] = useState<string | null>(null)
   const [edit, setEdit] = useState<Rec | Partial<Rec> | null>(null)
@@ -174,7 +157,6 @@ export function Records() {
     <>
       <PageHead title="Records" sub={attention ? `${attention} need${attention === 1 ? 's' : ''} a look` : 'Documents and the facts you need fast'} back="#/more" icon="layers" color="var(--peach)"
         action={<button class="btn primary sm" onClick={() => setEdit(blank())}><Icon name="plus" size={16} />Add</button>} />
-      {prefs.previewExpiry && <Preview />}
       {rows === null ? <div class="skeleton" /> : !rows.length ? (
         <div class="card soft"><p class="muted">Add the things you’d hate to dig for: insurance, car registration, tax returns, W-2s, your lease. Say where each original lives, and add the expiry date if it has one.</p></div>
       ) : (
@@ -187,6 +169,7 @@ export function Records() {
           {list.length ? <div class="rec-grid">{list.map((r) => <RecCard r={r} onOpen={() => setEdit(r)} />)}</div> : <div class="card"><p class="empty">Nothing matches.</p></div>}
         </>
       )}
+      <Inventories />
       <a class="card prompt" href="#/notes" style="--accent:var(--peach);margin-top:14px"><span class="orb"><Icon name="note" size={20} /></span><span class="grow"><h3>Notes</h3><p class="muted small">Lists, how-tos and anything else to keep</p></span><Icon name="chev" /></a>
       <Editor rec={edit} onClose={() => setEdit(null)} />
     </>

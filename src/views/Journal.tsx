@@ -37,15 +37,22 @@ const PROMPTS = [
   'Where did your time go today, and is that where you want it to go?',
 ]
 
+const DRAFT = 'journal-draft'
+
 export function JournalEditor({ open, entry, onClose }: { open: boolean; entry: JournalEntry | null; onClose: () => void }) {
   const areas = useStore((s) => s.areas.filter((a) => !a.archived))
   const [f, setF] = useState<Partial<JournalEntry>>({})
   const [prompt, setPrompt] = useState('')
   const [busy, setBusy] = useState(false)
   const [dropped, setDropped] = useState<string[]>([])
+  const [hadDraft, setHadDraft] = useState(false)
   const pick = useRef<HTMLInputElement>(null)
   useEffect(() => {
-    if (open) { setF(entry ? { ...entry, photos: entry.photos ?? [] } : { body: '', title: null, mood: null, area_id: null, photos: [] }); setDropped([]); setPrompt(PROMPTS[Math.floor(Math.random() * PROMPTS.length)]) }
+    if (!open) return
+    let draft: Partial<JournalEntry> | null = null
+    if (!entry) { try { draft = JSON.parse(localStorage.getItem(DRAFT) ?? 'null') } catch { /* none */ } }
+    setF(entry ? { ...entry, photos: entry.photos ?? [] } : draft ?? { body: '', title: null, mood: null, area_id: null, photos: [] })
+    setHadDraft(!!draft); setDropped([]); setPrompt(PROMPTS[Math.floor(Math.random() * PROMPTS.length)])
   }, [open])
   async function addPhotos(files: FileList | null) {
     if (!files?.length) return
@@ -54,10 +61,26 @@ export function JournalEditor({ open, entry, onClose }: { open: boolean; entry: 
     setBusy(false)
     setF((cur) => ({ ...cur, photos: [...(cur.photos ?? []), ...paths] }))
   }
+  /** Closing without Save: a new entry is kept as a draft for next time; edits to an old one are dropped. */
+  function dismiss() {
+    onClose()
+    if (entry) return
+    const has = (f.body?.trim() || f.title || (f.photos ?? []).length)
+    try {
+      if (has) { localStorage.setItem(DRAFT, JSON.stringify({ title: f.title ?? null, body: f.body ?? '', mood: f.mood ?? null, area_id: f.area_id ?? null, photos: f.photos ?? [] })); toast('Kept as a draft') }
+      else localStorage.removeItem(DRAFT)
+    } catch { /* storage off */ }
+  }
+  function discard() {
+    try { localStorage.removeItem(DRAFT) } catch { /* */ }
+    ;(f.photos ?? []).forEach(deletePhoto)
+    setF({ body: '', title: null, mood: null, area_id: null, photos: [] }); setHadDraft(false)
+  }
   async function save() {
     const body = f.body?.trim() ?? ''
     const photos = f.photos ?? []
     onClose()
+    if (!entry) try { localStorage.removeItem(DRAFT) } catch { /* */ }
     if (!body && !photos.length) { [...photos, ...dropped].forEach(deletePhoto); return }
     try {
       if (entry) await update('journal_entries', entry.id, { title: f.title || null, body, mood: f.mood ?? null, area_id: f.area_id ?? null, photos })
@@ -73,7 +96,8 @@ export function JournalEditor({ open, entry, onClose }: { open: boolean; entry: 
     if (row) toast('Entry deleted', () => restore('journal_entries', row as never))
   }
   return (
-    <Sheet open={open} onClose={save} wide>
+    <Sheet open={open} onClose={dismiss} wide title={entry ? 'Edit entry' : 'New entry'}>
+      {!entry && hadDraft && <div class="row between small" style="margin:-4px 0 8px"><span class="faint">Picked up your draft</span><button class="faint small" onClick={discard}>Start fresh</button></div>}
       <input class="input title bare" placeholder="Title (optional)" value={f.title ?? ''} onInput={(e) => setF({ ...f, title: (e.target as HTMLInputElement).value || null })} />
       {!entry && !f.body && <button class="faint small" style="margin:4px 2px 10px;text-align:left" onClick={() => setPrompt(PROMPTS[(PROMPTS.indexOf(prompt) + 1) % PROMPTS.length])}>{prompt} <span style="color:var(--lilac)">another</span></button>}
       {entry && isClaude(entry) && <p class="by-claude-note small">Claude wrote this summary from your brain dump. Edit anything that’s off.</p>}

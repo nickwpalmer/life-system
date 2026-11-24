@@ -13,11 +13,18 @@ import { BarChart } from '../ui/charts'
 export type Sub = { id: string; substance: string; amount: number | null; unit: string | null; occurred_at: string; time_known: boolean; note: string | null; source: string }
 
 const STARTERS: { name: string; unit: string; amount: number }[] = [
-  { name: 'Caffeine', unit: 'cup', amount: 1 }, { name: 'Alcohol', unit: 'drink', amount: 1 }, { name: 'Weed', unit: 'hit', amount: 1 },
+  { name: 'Caffeine', unit: 'mg', amount: 100 }, { name: 'Alcohol', unit: 'drink', amount: 1 }, { name: 'THC', unit: 'hit', amount: 1 },
   { name: 'NAD+', unit: 'mg', amount: 300 }, { name: 'Modafinil', unit: 'mg', amount: 100 },
 ]
 const COLORS = ['#ffa463', '#ff8cc8', '#79e2b4', '#8fc4ff', '#ffd66b', '#a98bff', '#ff8a7a', '#6fe0dc']
 export const subColor = (name: string, all: string[]) => COLORS[Math.max(0, all.indexOf(name)) % COLORS.length]
+
+/**
+ * Names that mean the same thing group together: case and spacing don't matter, anything in brackets
+ * ("NAD+ (injection)") is detail, and a few common aliases fold in.
+ */
+const ALIAS: Record<string, string> = { weed: 'thc', marijuana: 'thc', cannabis: 'thc', 'vape pen': 'thc', b12: 'methylcobalamin b12', 'vitamin b12': 'methylcobalamin b12', 'semax and selank': 'semax + selank', 'neuro strip': 'semax + selank', beer: 'alcohol', wine: 'alcohol' }
+export const subKey = (name: string) => { const k = name.toLowerCase().replace(/\(.*?\)/g, '').replace(/\s+/g, ' ').trim(); return ALIAS[k] ?? k }
 
 registerDemo('substance_logs', () => {
   const out: Sub[] = []
@@ -33,10 +40,12 @@ registerDemo('substance_logs', () => {
 
 /** Names you've used, most recent first, then the starters you haven't. */
 function useNames(rows: Sub[] | null) {
-  const seen: string[] = []
-  for (const r of rows ?? []) if (!seen.includes(r.substance)) seen.push(r.substance)
-  return [...seen, ...STARTERS.map((s) => s.name).filter((n) => !seen.includes(n))]
+  const seen: string[] = [], keys = new Set<string>()
+  for (const r of rows ?? []) { const k = subKey(r.substance); if (!keys.has(k)) { keys.add(k); seen.push(r.substance.replace(/\s*\(.*?\)\s*/g, ' ').trim()) } }
+  return [...seen, ...STARTERS.map((s) => s.name).filter((n) => !keys.has(subKey(n)))]
 }
+/** The display name a row belongs to. */
+const nameFor = (r: Sub, names: string[]) => names.find((n) => subKey(n) === subKey(r.substance)) ?? r.substance
 
 export function SubstanceSheet({ open, onClose, initial }: { open: boolean; onClose: () => void; initial?: string }) {
   const rows = useRows<Sub>('substance_logs')
@@ -49,13 +58,14 @@ export function SubstanceSheet({ open, onClose, initial }: { open: boolean; onCl
   const [note, setNote] = useState('')
   const pick = (n: string) => {
     setName(n)
-    const last = rows?.find((r) => r.substance === n)
+    const last = rows?.find((r) => subKey(r.substance) === subKey(n))
     const st = STARTERS.find((s) => s.name === n)
     setAmount(String(last?.amount ?? st?.amount ?? 1)); setUnit(last?.unit ?? st?.unit ?? '')
   }
   const reset = () => { setName(''); setAmount(''); setUnit(''); setWhen('now'); setTime(''); setNote('') }
   async function save() {
-    const n = name.trim()
+    // Reuse the name you've logged before, so "caffeine" and "Caffeine" stay one thing.
+    const n = names.find((x) => subKey(x) === subKey(name)) ?? name.trim()
     if (!n) return
     let at = new Date()
     if (when === 'earlier' && time) { const [h, m] = time.split(':').map(Number); at = new Date(); at.setHours(h, m, 0, 0) }
@@ -69,7 +79,7 @@ export function SubstanceSheet({ open, onClose, initial }: { open: boolean; onCl
   return (
     <Sheet open={open} onClose={() => { reset(); onClose() }} title="Log a substance">
       <div class="chips" style="margin-bottom:14px">
-        {names.slice(0, 10).map((n) => <button class={`chip ${name === n ? 'on' : ''}`} style={`--c:${subColor(n, names)}`} onClick={() => pick(n)}>{n}</button>)}
+        {names.slice(0, 12).map((n) => <button class={`chip ${name === n ? 'on' : ''}`} style={`--c:${subColor(n, names)}`} onClick={() => pick(n)}>{n}</button>)}
       </div>
       <label class="field"><span>What</span><input class="input" placeholder="Anything non-food" value={name} onInput={(e) => setName((e.target as HTMLInputElement).value)} /></label>
       <div class="row">
@@ -102,7 +112,7 @@ export function GlobalSubstanceSheet() {
 const fmtAmt = (r: Sub) => r.amount != null ? `${r.amount}${r.unit ? ` ${r.unit}` : ''}` : ''
 
 function Detail({ name, rows, color }: { name: string; rows: Sub[]; color: string }) {
-  const mine = rows.filter((r) => r.substance === name)
+  const mine = rows.filter((r) => subKey(r.substance) === subKey(name))
   const byDay = new Map<string, number>()
   for (const r of mine) { const d = dayKey(new Date(r.occurred_at)); byDay.set(d, (byDay.get(d) ?? 0) + (r.amount ?? 1)) }
   // Calendar: the last 8 weeks, Monday first.
@@ -136,10 +146,14 @@ function Detail({ name, rows, color }: { name: string; rows: Sub[]; color: strin
 export function Substances() {
   const rows = useRows<Sub>('substance_logs')
   const names = useNames(rows)
-  const used = names.filter((n) => rows?.some((r) => r.substance === n))
+  const used = names.filter((n) => rows?.some((r) => subKey(r.substance) === subKey(n)))
   const [sel, setSel] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
-  const list = (rows ?? []).filter((r) => !sel || r.substance === sel)
+  const [newest, setNewest] = useState(true)
+  const choose = (n: string | null) => { setSel(n); window.scrollTo({ top: 0, behavior: 'smooth' }) }
+  const wk = dayKey(weekStart())
+  const countWeek = (n: string) => (rows ?? []).filter((r) => subKey(r.substance) === subKey(n) && dayKey(new Date(r.occurred_at)) >= wk).length
+  const list = (rows ?? []).filter((r) => !sel || subKey(r.substance) === subKey(sel)).sort((a, b) => newest ? b.occurred_at.localeCompare(a.occurred_at) : a.occurred_at.localeCompare(b.occurred_at))
   const groups = new Map<string, Sub[]>()
   for (const r of list.slice(0, 200)) { const d = dayKey(new Date(r.occurred_at)); groups.set(d, [...(groups.get(d) ?? []), r]) }
   const del = async (r: Sub) => { if (confirm(`Delete this ${r.substance} entry?`)) await dropRow('substance_logs', r.id).catch(() => {}) }
@@ -151,21 +165,21 @@ export function Substances() {
         <div class="card soft"><p class="muted">Nothing logged yet. Tap Log, or use Substance in the quick log on Home. Coffee, a drink, a supplement or a med all go here.</p></div>
       ) : (
         <>
-          <div class="chips scroll" style="margin-bottom:14px">
-            <button class={`chip ${!sel ? 'on' : ''}`} onClick={() => setSel(null)}>All</button>
-            {used.map((n) => <button class={`chip ${sel === n ? 'on' : ''}`} style={`--c:${subColor(n, names)}`} onClick={() => setSel(n)}>{n}</button>)}
+          <div class="sub-pick">
+            <button class={`sub-tile ${!sel ? 'on' : ''}`} onClick={() => choose(null)}><b>All</b><span>{rows.length} logged</span></button>
+            {used.map((n) => <button class={`sub-tile ${sel === n ? 'on' : ''}`} style={`--c:${subColor(n, names)}`} onClick={() => choose(sel === n ? null : n)}><b>{n}</b><span>{countWeek(n)} this week</span></button>)}
           </div>
           {sel && <Detail name={sel} rows={rows} color={subColor(sel, names)} />}
-          <Card title={sel ? `${sel} log` : 'Log'} icon="list" accent="var(--orange)">
+          <Card title={sel ? `${sel} log` : 'Log'} icon="list" accent="var(--orange)" action={<button class="faint small" onClick={() => setNewest(!newest)}>{newest ? 'Newest first' : 'Oldest first'}</button>}>
             {[...groups].map(([d, items]) => (
               <div class="sublog">
                 <div class="faint small" style="margin:10px 2px 4px">{fmtDay(d)}</div>
                 {items.map((r) => (
-                  <div class="row" style="padding:7px 2px;border-bottom:1px solid var(--line)">
-                    <i class="dot" style={`background:${subColor(r.substance, names)}`} />
-                    <span class="grow">{r.substance} <span class="muted small">{fmtAmt(r)}</span>{r.note && <div class="faint small">{r.note}</div>}</span>
-                    <span class="faint small">{r.time_known ? fmtTime(r.occurred_at) : 'today'}</span>
-                    <button class="faint" aria-label="Delete" onClick={() => del(r)}><Icon name="x" size={15} /></button>
+                  <div class="row subrow" onClick={() => choose(nameFor(r, names))}>
+                    <i class="dot" style={`background:${subColor(nameFor(r, names), names)}`} />
+                    <span class="grow" style="min-width:0"><b class="w5">{nameFor(r, names)}</b>{fmtAmt(r) && <span class="muted"> {fmtAmt(r)}</span>}{r.note && <div class="faint small">{r.note}</div>}</span>
+                    <span class="faint small">{r.time_known ? fmtTime(r.occurred_at) : d === today() ? 'Today' : ''}</span>
+                    <button class="faint" aria-label="Delete" onClick={(e) => { e.stopPropagation(); del(r) }}><Icon name="x" size={15} /></button>
                   </div>
                 ))}
               </div>

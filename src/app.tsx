@@ -22,13 +22,33 @@ import { CheckinView } from './views/Checkin'
 import { Goals } from './views/Goals'
 import { WeeklyReview } from './views/Review'
 import { AreaView } from './views/Area'
-import { People } from './views/People'
+import { People, GlobalPersonSheet } from './views/People'
 import { Capture } from './views/Capture'
 import { Substances, GlobalSubstanceSheet } from './views/Substances'
 import { Education } from './views/Education'
 import { Changes } from './views/Changes'
 import { Help } from './views/Help'
 import { usePrefs, logoUrl, applyTheme, applyLogo } from './lib/prefs'
+import { syncAll } from './lib/sync'
+
+/** Pull down at the top of any screen to sync with the database. */
+function PullToSync() {
+  const [pull, setPull] = useState(0)
+  const [busy, setBusy] = useState(false)
+  useEffect(() => {
+    let y0: number | null = null, d = 0
+    const start = (e: TouchEvent) => { y0 = window.scrollY <= 0 && !document.querySelector('.sheet') ? e.touches[0].clientY : null; d = 0 }
+    const move = (e: TouchEvent) => { if (y0 === null) return; d = Math.max(0, e.touches[0].clientY - y0); setPull(Math.min(d, 110)) }
+    const end = () => {
+      if (y0 !== null && d > 80) { setBusy(true); syncAll().finally(() => setBusy(false)) }
+      y0 = null; d = 0; setPull(0)
+    }
+    addEventListener('touchstart', start, { passive: true }); addEventListener('touchmove', move, { passive: true }); addEventListener('touchend', end)
+    return () => { removeEventListener('touchstart', start); removeEventListener('touchmove', move); removeEventListener('touchend', end) }
+  }, [])
+  if (!pull && !busy) return null
+  return <div class={`ptr ${busy || pull > 80 ? 'ready' : ''}`} style={`transform:translate(-50%, ${busy ? 18 : pull * 0.4}px)`}><Icon name="history" size={18} />{busy ? 'Syncing…' : pull > 80 ? 'Release to sync' : 'Pull to sync'}</div>
+}
 
 function useRoute() {
   const get = () => location.hash.replace(/^#\/?/, '') || 'today'
@@ -60,7 +80,7 @@ export const NAV: NavItem[] = [
   { r: 'insights', icon: 'chart', label: 'Insights', c: 'var(--teal)', group: 'life', sub: 'Patterns and reviews' },
   { r: 'people', icon: 'users', label: 'People', c: 'var(--coral)', group: 'life', sub: 'Birthdays, keeping in touch' },
   { r: 'records', icon: 'layers', label: 'Records', c: 'var(--peach)', group: 'life', sub: 'Insurance, car, taxes, notes' },
-  { r: 'changes', icon: 'undo', label: 'Claude’s changes', c: 'var(--violet)', group: 'system', sub: 'See and undo edits' },
+  { r: 'changes', icon: 'history', label: 'Claude’s changes', c: 'var(--violet)', group: 'system', sub: 'See, undo, leave Claude a note' },
   { r: 'settings', icon: 'gear', label: 'Settings', c: 'var(--muted)', group: 'system', sub: 'Preferences and connections' },
   { r: 'help', icon: 'help', label: 'Help', c: 'var(--sky)', group: 'system', sub: 'How things work' },
 ]
@@ -172,7 +192,7 @@ export function App() {
     case 'health': view = <AreaView areaKey="health" />; break
     case 'substances': view = <Substances />; break
     case 'changes': view = <Changes />; break
-    case 'help': view = <Help />; break
+    case 'help': view = <Help section={sub} />; break
     case 'inbox': view = <Tasks initial="inbox" />; break
     case 'log': view = <DailyLog day={sub || today()} />; break
     case 'journal': view = <Journal />; break
@@ -202,6 +222,8 @@ export function App() {
       <TabBar base={base} />
       <Capture />
       <GlobalSubstanceSheet />
+      <GlobalPersonSheet />
+      <PullToSync />
       <Toast />
     </>
   )

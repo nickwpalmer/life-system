@@ -1,6 +1,7 @@
-import { useState } from 'preact/hooks'
+import { useEffect, useState } from 'preact/hooks'
 import { Icon } from '../ui/icons'
 import { PageHead } from '../ui/kit'
+import { HealthSync } from './HealthSync'
 
 const QA: [string, string][] = [
   ['How do I put Life on my iPhone Home Screen?', 'Open the app in Safari, tap Share, then Add to Home Screen. It opens full screen like any other app.'],
@@ -12,11 +13,14 @@ const QA: [string, string][] = [
   ['When does Home switch between morning, day and night?', 'By default morning runs 4:30 to 9 AM, the quick log 9 AM to 8 PM, and night 8 PM to 4:30 AM. Change the times in Settings.'],
   ['Where does my data live?', 'In your own private database. Only you can read it when signed in, and Claude reads it with your permission to keep things up to date. The app’s code is public, but none of your data is in it.'],
   ['What goes in Records?', 'Insurance, car registration, tax returns, W-2s, your lease, IDs: anything you’d hate to dig for. Each record says where the original is and can link to the file in Google Drive. Add an expiry date and the card turns gold in the last 30 days and red once it has passed. Records with no date never show as expired. Usernames are fine; passwords and SSNs stay out.'],
-  ['How does Apple Health get in?', 'A Shortcut on your iPhone sends last night’s sleep and yesterday’s steps each morning. Settings has the steps to set it up.'],
+  ['How does Apple Health get in?', 'A Shortcut on your iPhone sends last night’s sleep, steps, resting heart rate and HRV each morning. The setup is below. They show in the daily log as read-only numbers; tap “Fix a number” there if one is wrong.'],
+  ['Where’s the undo for Claude’s changes?', 'Open Everything, then Claude’s changes. Each change has its own Undo. Undoing leaves Claude a note so it won’t redo it, and you can leave Claude a note there too. Claude reads those notes before it changes anything.'],
+  ['How do I refresh?', 'Pull down at the top of any page, or use Sync now in Settings. The app also refreshes whenever you come back to it.'],
 ]
 
-export function Help() {
+export function Help({ section }: { section?: string }) {
   const [open, setOpen] = useState<number | null>(null)
+  useEffect(() => { if (section === 'health') setTimeout(() => document.getElementById('health')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 300) }, [section])
   return (
     <>
       <PageHead title="Help" sub="How things work" back="#/more" icon="help" color="var(--sky)" />
@@ -28,6 +32,7 @@ export function Help() {
           </div>
         ))}
       </section>
+      <div id="health"><HealthSync /></div>
       <p class="faint small" style="text-align:center">Anything else, just ask Claude.</p>
     </>
   )

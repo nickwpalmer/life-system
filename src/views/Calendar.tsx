@@ -14,17 +14,43 @@ import { SchoolPanel } from './School'
 type Mode = 'week' | 'month' | 'work' | 'school' | 'free'
 const LAYERS: [CalRole, string, string][] = [
   ['personal', 'Personal', 'var(--sky)'], ['work', 'Work', 'var(--gold)'], ['classes', 'Classes', 'var(--lilac)'],
-  ['assignments', 'Assignments', 'var(--pink)'], ['important', 'Important', 'var(--orange)'],
+  ['assignments', 'Assignments', 'var(--pink)'], ['important', 'Time blocks', 'var(--orange)'],
 ]
 const isExam = (e: CalEvent) => /\b(exam|test|quiz|final|midterm)\b/i.test(e.title)
 const hoursOf = (e: CalEvent) => e.all_day || !e.ends_at ? 0 : Math.max(0, (new Date(e.ends_at).getTime() - new Date(e.starts_at).getTime()) / 3600e3)
 const fmtH = (h: number) => `${Math.round(h * 10) / 10}h`
+const fmtMoney = (n: number) => `$${Math.round(n).toLocaleString()}`
 
-/** Events on the layers you have switched on. Exams always show, even when assignments are hidden. */
+/**
+ * Travel around a day's blocks: one trip there before the first block and one back after the last,
+ * for class days and for shifts (minutes each way come from Settings). Nothing is added to Google Calendar.
+ */
+function travelOn(all: CalEvent[], p: Prefs, d: string): [number, number][] {
+  const out: [number, number][] = []
+  for (const [role, mins] of [['classes', p.commute.school], ['work', p.commute.work]] as const) {
+    if (!mins) continue
+    const ev = eventsOn(all, d).filter((e) => !e.all_day && e.ends_at && calRole(p, e.calendar_name) === role)
+    if (!ev.length) continue
+    const s = Math.min(...ev.map((e) => new Date(e.starts_at).getTime())), e = Math.max(...ev.map((e) => new Date(e.ends_at!).getTime()))
+    out.push([s - mins * 60e3, s], [e, e + mins * 60e3])
+  }
+  return out
+}
+/** Hours covered by a set of intervals, overlaps counted once. */
+function union(iv: [number, number][]) {
+  let total = 0, cur: [number, number] | null = null
+  for (const [s, e] of [...iv].sort((a, b) => a[0] - b[0])) { if (!cur || s > cur[1]) { if (cur) total += cur[1] - cur[0]; cur = [s, e] } else cur[1] = Math.max(cur[1], e) }
+  if (cur) total += cur[1] - cur[0]
+  return total / 3600e3
+}
+const leaveBy = (iso: string, mins: number) => fmtTime(new Date(new Date(iso).getTime() - mins * 60e3).toISOString())
+
+/** Events on the layers you have switched on. Exams always show, even when assignments are hidden.
+ * (The 'important' role key is kept for saved settings; on screen it is "Time blocks", the calendar you plan your time on.) */
 function useVisible() {
   const events = useStore((s) => s.events)
   const p = usePrefs()
-  return { p, all: events, shown: events.filter((e) => p.cal[calRole(p, e.calendar_name)] || (p.cal.important && calRole(p, e.calendar_name) === 'assignments' && isExam(e))) }
+  return { p, all: events, shown: events.filter((e) => p.cal[calRole(p, e.calendar_name)] || (calRole(p, e.calendar_name) === 'assignments' && isExam(e))) }
 }
 
 function Layers({ p, names }: { p: Prefs; names: string[] }) {
@@ -157,6 +183,9 @@ function Work({ all }: { all: CalEvent[] }) {
   const weeks = Array.from({ length: 8 }, (_, i) => dayKey(addDays(ws, 7 * (i - 4))))
   const weekly = weeks.map((w) => sum(fromKey(w), addDays(fromKey(w), 7)))
   const upcoming = work.filter((e) => eventDay(e) >= t).sort((a, b) => a.starts_at.localeCompare(b.starts_at)).slice(0, 8)
+  const perHour = (p.pay.rate ?? 0) + (p.pay.tips ?? 0)
+  const tripsIn = (a: Date, b: Date) => new Set(work.filter((e) => inRange(e, a, b) && !e.all_day).map(eventDay)).size
+  const driveWeek = tripsIn(ws, addDays(ws, 7)) * 2 * p.commute.work / 60
   if (!work.length && !wTasks.length) return <div class="card soft"><p class="muted">No work calendar yet. Tap the sliders button above and mark which Google calendar holds your shifts.</p></div>
   return (
     <>
@@ -165,9 +194,10 @@ function Work({ all }: { all: CalEvent[] }) {
         <div><b>{fmtH(nextWeek)}</b><span>next week</span></div>
         <div><b>{fmtH(thisMonth)}</b><span>{m0.toLocaleDateString([], { month: 'long' })}</span></div>
       </div>
+      <PayCard p={p} week={thisWeek} next={nextWeek} month={thisMonth} perHour={perHour} drive={driveWeek} />
       <Card title="Shifts" icon="cal" accent="var(--gold)">
         {upcoming.length ? upcoming.map((e) => (
-          <div class="event" style="--c:var(--gold)"><span class="when">{fmtDay(eventDay(e)).replace(/,.*/, '')}<div class="faint tiny">{fmtTime(e.starts_at)}</div></span><span class="bar-v" /><span class="grow"><div class="e-t">{e.title}</div><div class="faint tiny">{fmtTime(e.starts_at)} to {e.ends_at ? fmtTime(e.ends_at) : ''} · {fmtH(hoursOf(e))}</div></span></div>
+          <div class="event" style="--c:var(--gold)"><span class="when">{fmtDay(eventDay(e)).replace(/,.*/, '')}<div class="faint tiny">{fmtTime(e.starts_at)}</div></span><span class="bar-v" /><span class="grow"><div class="e-t">{e.title}</div><div class="faint tiny">{fmtTime(e.starts_at)} to {e.ends_at ? fmtTime(e.ends_at) : ''} · {fmtH(hoursOf(e))}{perHour ? ` · about ${fmtMoney(hoursOf(e) * perHour)}` : ''}{p.commute.work && !e.all_day ? ` · leave by ${leaveBy(e.starts_at, p.commute.work)}` : ''}</div></span></div>
         )) : <p class="empty" style="padding:8px">No shifts coming up.</p>}
       </Card>
       <Card title="Hours each week" icon="chart" accent="var(--gold)"><BarChart days={weeks} values={weekly} color="#ffd66b" /><p class="faint tiny" style="margin-top:6px">Four weeks back, this week, and three ahead, from your calendar.</p></Card>
@@ -179,17 +209,49 @@ function Work({ all }: { all: CalEvent[] }) {
   )
 }
 
+/** Pay estimate from shift hours. Rate and tips are set here or in Settings; actual pay comes from stubs later. */
+function PayCard({ p, week, next, month, perHour, drive }: { p: Prefs; week: number; next: number; month: number; perHour: number; drive: number }) {
+  const [edit, setEdit] = useState(false)
+  const num = (v: string) => v === '' ? null : Number(v)
+  if (!perHour || edit) return (
+    <Card title="Pay estimate" icon="money" accent="var(--gold)">
+      <p class="faint small" style="margin:-4px 0 10px">Add your rate and roughly what tips come to per hour, and shifts turn into an estimate. You can fine-tune it from pay stubs later.</p>
+      <div class="row">
+        <label class="field grow"><span>Hourly rate ($)</span><input class="input" type="number" inputMode="decimal" value={p.pay.rate ?? ''} onChange={(e) => savePrefs({ pay: { ...p.pay, rate: num((e.target as HTMLInputElement).value) } })} /></label>
+        <label class="field grow"><span>Tips per hour ($)</span><input class="input" type="number" inputMode="decimal" value={p.pay.tips ?? ''} onChange={(e) => savePrefs({ pay: { ...p.pay, tips: num((e.target as HTMLInputElement).value) } })} /></label>
+      </div>
+      {perHour > 0 && <button class="btn sm ghost" onClick={() => setEdit(false)}>Done</button>}
+    </Card>
+  )
+  return (
+    <Card title="Pay estimate" icon="money" accent="var(--gold)" action={<button class="faint small" onClick={() => setEdit(true)}>Edit</button>}>
+      <div class="stats3" style="margin:0">
+        <div><b style="color:var(--gold)">{fmtMoney(week * perHour)}</b><span>this week</span></div>
+        <div><b>{fmtMoney(next * perHour)}</b><span>next week</span></div>
+        <div><b>{fmtMoney(month * perHour)}</b><span>this month</span></div>
+      </div>
+      <p class="faint tiny" style="margin-top:8px">Before tax, at ${perHour.toFixed(2)} an hour{p.pay.tips ? ' with tips' : ''}.{drive ? ` About ${fmtH(drive)} of driving this week on top.` : ''}</p>
+    </Card>
+  )
+}
+
 function School({ all }: { all: CalEvent[] }) {
   const p = usePrefs()
   const ws = weekStart()
   const cls = all.filter((e) => calRole(p, e.calendar_name) === 'classes' && new Date(e.starts_at) >= ws && new Date(e.starts_at) < addDays(ws, 7))
+  const campusDays = [...new Set(cls.filter((e) => !e.all_day).map(eventDay))].sort()
+  const drive = campusDays.length * 2 * p.commute.school / 60
+  const t = today()
+  const nextDay = campusDays.find((d) => d >= t)
+  const firstNext = nextDay ? cls.filter((e) => eventDay(e) === nextDay && !e.all_day).sort((a, b) => a.starts_at.localeCompare(b.starts_at))[0] : null
   return (
     <>
       <div class="stats3">
         <div><b>{cls.length}</b><span>classes this week</span></div>
-        <div><b>{fmtH(cls.reduce((a, e) => a + hoursOf(e), 0))}</b><span>in class</span></div>
+        <div><b>{fmtH(cls.reduce((a, e) => a + hoursOf(e), 0))}</b><span>in class{drive ? ` + ${fmtH(drive)} driving` : ''}</span></div>
         <div><a href="#/school" style="color:inherit;text-decoration:none"><b><Icon name="school" size={22} /></b><span>Education</span></a></div>
       </div>
+      {firstNext && p.commute.school > 0 && <p class="faint small" style="margin:-4px 6px 12px">{nextDay === t ? 'Today' : fmtDay(nextDay!).replace(/,.*/, '')}: leave by <b style="color:var(--text)">{leaveBy(firstNext.starts_at, p.commute.school)}</b> for {firstNext.title}.</p>}
       <SchoolPanel />
     </>
   )
@@ -211,33 +273,31 @@ function Free({ all }: { all: CalEvent[] }) {
   const busyOn = (d: string) => {
     // Timed events only, merged so overlaps aren't counted twice. Assignments are deadlines, not time blocks.
     const iv = eventsOn(all, d).filter((e) => !e.all_day && e.ends_at && calRole(p, e.calendar_name) !== 'assignments')
-      .map((e) => [new Date(e.starts_at).getTime(), new Date(e.ends_at!).getTime()] as [number, number]).sort((a, b) => a[0] - b[0])
-    let total = 0, cur: [number, number] | null = null
-    for (const [s, e] of iv) { if (!cur || s > cur[1]) { if (cur) total += cur[1] - cur[0]; cur = [s, e] } else cur[1] = Math.max(cur[1], e) }
-    if (cur) total += cur[1] - cur[0]
-    return total / 3600e3
+      .map((e) => [new Date(e.starts_at).getTime(), new Date(e.ends_at!).getTime()] as [number, number])
+    const blocks = union(iv)
+    return { blocks, travel: Math.max(0, union([...iv, ...travelOn(all, p, d)]) - blocks) }
   }
-  const rows = days.map((d) => { const s = sleep[d] ?? p.sleepDefault; const b = Math.min(24 - s, busyOn(d)); return { d, s, b, f: Math.max(0, 24 - s - b - 2) } })
+  const rows = days.map((d) => { const s = sleep[d] ?? p.sleepDefault; const { blocks, travel } = busyOn(d); const b = Math.min(24 - s, blocks); const tr = Math.min(24 - s - b, travel); return { d, s, b, tr, f: Math.max(0, 24 - s - b - tr - 2) } })
   const free = rows.reduce((a, r) => a + r.f, 0)
   return (
     <>
       <Nav label={offset === 0 ? 'This week' : offset === 1 ? 'Next week' : `Week of ${fromKey(days[0]).toLocaleDateString([], { month: 'short', day: 'numeric' })}`} onPrev={() => setOffset(offset - 1)} onNext={() => setOffset(offset + 1)} onToday={offset ? () => setOffset(0) : undefined} />
       <div class="stats3">
         <div><b style="color:var(--mint)">{fmtH(free)}</b><span>free this week</span></div>
-        <div><b>{fmtH(rows.reduce((a, r) => a + r.b, 0))}</b><span>booked</span></div>
+        <div><b>{fmtH(rows.reduce((a, r) => a + r.b + r.tr, 0))}</b><span>booked{rows.some((r) => r.tr) ? ' + travel' : ''}</span></div>
         <div><b>{fmtH(rows.reduce((a, r) => a + r.s, 0) / 7)}</b><span>sleep a night</span></div>
       </div>
       <section class="card">
         {rows.map((r) => (
           <div class="freerow">
-            <div class="row between small"><b>{fromKey(r.d).toLocaleDateString([], { weekday: 'short', day: 'numeric' })}</b><span class="faint">{fmtH(r.f)} free</span></div>
-            <div class="freebar"><i style={`width:${(r.s / 24) * 100}%;background:var(--violet)`} /><i style={`width:${(r.b / 24) * 100}%;background:var(--gold)`} /><i style={`width:${(2 / 24) * 100}%;background:var(--surface-3)`} /><i style={`width:${(r.f / 24) * 100}%;background:var(--mint)`} /></div>
+            <div class="row between small"><b>{fromKey(r.d).toLocaleDateString([], { weekday: 'short', day: 'numeric' })}</b><span class="faint">{r.tr ? `${fmtH(r.tr)} driving · ` : ''}{fmtH(r.f)} free</span></div>
+            <div class="freebar"><i style={`width:${(r.s / 24) * 100}%;background:var(--violet)`} /><i style={`width:${(r.b / 24) * 100}%;background:var(--gold)`} /><i style={`width:${(r.tr / 24) * 100}%;background:var(--peach)`} /><i style={`width:${(2 / 24) * 100}%;background:var(--surface-3)`} /><i style={`width:${(r.f / 24) * 100}%;background:var(--mint)`} /></div>
             <label class="row small" style="gap:10px"><span class="faint" style="width:70px">Sleep {r.s}h</span><input class="range grow" type="range" min="4" max="11" step="0.5" value={r.s} onInput={(e) => setSleep({ ...sleep, [r.d]: Number((e.target as HTMLInputElement).value) })} aria-label={`Sleep on ${fmtDay(r.d)}`} /></label>
           </div>
         ))}
-        <div class="legend"><span><i class="dot" style="background:var(--violet)" />Sleep</span><span><i class="dot" style="background:var(--gold)" />On the calendar</span><span><i class="dot" style="background:var(--surface-3)" />Getting ready, meals (2h)</span><span><i class="dot" style="background:var(--mint)" />Free</span></div>
+        <div class="legend"><span><i class="dot" style="background:var(--violet)" />Sleep</span><span><i class="dot" style="background:var(--gold)" />On the calendar</span>{rows.some((r) => r.tr) && <span><i class="dot" style="background:var(--peach)" />Travel</span>}<span><i class="dot" style="background:var(--surface-3)" />Getting ready, meals (2h)</span><span><i class="dot" style="background:var(--mint)" />Free</span></div>
       </section>
-      <p class="faint small" style="margin:0 6px 14px">{avg != null ? `You’ve averaged ${fmtH(avg)} of sleep over the last two weeks. ` : ''}Every extra hour of sleep comes out of free time, one for one. Your default is {p.sleepDefault}h; <button class="link" onClick={() => savePrefs({ sleepDefault: Math.round(((rows.reduce((a, r) => a + r.s, 0) / 7)) * 2) / 2 })}>make this week’s average the default</button>.</p>
+      <p class="faint small" style="margin:0 6px 14px">{avg != null ? `You’ve averaged ${fmtH(avg)} of sleep over the last two weeks. ` : ''}Every extra hour of sleep comes out of free time, one for one.{!p.commute.school && !p.commute.work ? <> Add your drive times in <a class="link" href="#/settings">Settings</a> to count travel too.</> : ''} Your default is {p.sleepDefault}h; <button class="link" onClick={() => savePrefs({ sleepDefault: Math.round(((rows.reduce((a, r) => a + r.s, 0) / 7)) * 2) / 2 })}>make this week’s average the default</button>.</p>
     </>
   )
 }

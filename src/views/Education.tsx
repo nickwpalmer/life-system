@@ -58,12 +58,89 @@ const termPct = (c: Course) => {
 }
 const tint = (c: Course, i: number) => c.color ?? COURSE_COLORS[i % COURSE_COLORS.length]
 const codeSlug = (code: string) => code.replace(/\s+/g, '-')
+const norm = (x: string | null | undefined) => (x ?? '').replace(/[^a-z0-9]/gi, '').toUpperCase()
+
+type GradeLog = { id: string; course_id: string; estimate: number | null; letter: string | null; note: string | null; logged_at: string }
+registerDemo('grade_logs', () => [
+  { id: 'g1', course_id: 'c0', estimate: 84, letter: 'B', note: 'After test 1', logged_at: new Date(Date.now() - 20 * 864e5).toISOString() },
+  { id: 'g2', course_id: 'c0', estimate: 88, letter: 'B+', note: 'Labs all in', logged_at: new Date(Date.now() - 4 * 864e5).toISOString() },
+] as never)
+const letterFor = (n: number) => n >= 93 ? 'A' : n >= 90 ? 'A-' : n >= 87 ? 'B+' : n >= 83 ? 'B' : n >= 80 ? 'B-' : n >= 77 ? 'C+' : n >= 73 ? 'C' : n >= 70 ? 'C-' : n >= 60 ? 'D' : 'F'
+
+/**
+ * How far through a class's known work you are: Canvas assignments whose date has passed, plus tasks you've
+ * finished, out of everything known for the term. A rough read, not a grade.
+ */
+function useWork(code: string) {
+  const events = useStore((s) => s.events)
+  const tasks = useStore((s) => s.tasks)
+  const now = new Date().toISOString()
+  const canvas = events.filter((e) => e.calendar_name === 'Canvas' && !/^lesson\b/i.test(e.title) && norm(e.title.match(/\[([^\]]+)\]\s*$/)?.[1]) === norm(code))
+  const mine = tasks.filter((t) => courseOf(t) === code)
+  const doneT = mine.filter((t) => !openTask(t)).length
+  const past = canvas.filter((e) => e.starts_at < now).length
+  const total = canvas.length + mine.length
+  return { total, done: past + doneT, open: mine.filter(openTask), canvasLeft: canvas.length - past }
+}
+function useGrades(courseId: string | undefined) {
+  const rows = useRows<GradeLog>('grade_logs')
+  return (rows ?? []).filter((g) => g.course_id === courseId).sort((a, b) => a.logged_at.localeCompare(b.logged_at))
+}
+
+/** Estimated grade, logged over time. Each save is a new entry, so you can see the trend through the term. */
+function GradeCard({ course, color }: { course: Course; color: string }) {
+  const log = useGrades(course.id)
+  const [v, setV] = useState('')
+  const [note, setNote] = useState('')
+  const last = log[log.length - 1]
+  async function add() {
+    const n = Number(v); if (!v || Number.isNaN(n)) return
+    setV(''); setNote('')
+    await addRow('grade_logs', { course_id: course.id, estimate: n, letter: letterFor(n), note: note.trim() || null, logged_at: new Date().toISOString() }).catch(() => {})
+  }
+  const pts = log.filter((g) => g.estimate != null)
+  const lo = Math.min(60, ...pts.map((g) => g.estimate!)), hi = 100
+  return (
+    <Card title="Estimated grade" icon="chart" accent={color}>
+      {last ? <div class="row between" style="margin-bottom:10px"><span><b style={`font-size:28px;color:${color}`}>{last.letter ?? letterFor(last.estimate ?? 0)}</b> <span class="muted">{last.estimate != null ? `${Math.round(last.estimate)}%` : ''}</span></span><span class="faint small">as of {fmtDay(last.logged_at.slice(0, 10)).replace(/,.*/, '')}</span></div>
+        : <p class="faint small" style="margin:-4px 0 10px">Log what you think your grade is now, from Canvas or a guess. Do it after each test or every couple of weeks and you’ll see the trend.</p>}
+      {pts.length > 1 && <svg class="gline" viewBox="0 0 100 34" preserveAspectRatio="none">
+        <polyline fill="none" stroke={color} stroke-width="2" vector-effect="non-scaling-stroke" points={pts.map((g, i) => `${(i / (pts.length - 1)) * 100},${32 - ((g.estimate! - lo) / (hi - lo)) * 30}`).join(' ')} />
+      </svg>}
+      <div class="row" style="gap:8px">
+        <input class="input" style="width:90px" type="number" inputMode="decimal" placeholder="%" value={v} onInput={(e) => setV((e.target as HTMLInputElement).value)} onKeyDown={(e) => { if (e.key === 'Enter') add() }} />
+        <input class="input grow" placeholder="Note (optional)" value={note} onInput={(e) => setNote((e.target as HTMLInputElement).value)} onKeyDown={(e) => { if (e.key === 'Enter') add() }} />
+        {v && <button class="btn sm primary" onClick={add}>Log</button>}
+      </div>
+      {log.length > 0 && <div style="margin-top:10px">{[...log].reverse().slice(0, 6).map((g) => (
+        <div class="row between small fin-row"><span>{g.letter ?? ''} {g.estimate != null ? `${Math.round(g.estimate)}%` : ''}{g.note ? <span class="faint"> · {g.note}</span> : null}</span>
+          <span class="row" style="gap:8px"><span class="faint">{fmtDay(g.logged_at.slice(0, 10)).replace(/,.*/, '')}</span><button class="faint tiny" aria-label="Remove" onClick={() => dropRow('grade_logs', g.id).catch(() => {})}><Icon name="x" size={12} /></button></span></div>
+      ))}</div>}
+    </Card>
+  )
+}
+
+/** One class tile on the overview: ring is how far through the known work you are; the letter is your latest estimate. */
+function ClassTile({ c, i }: { c: Course; i: number }) {
+  const w = useWork(c.code)
+  const g = useGrades(c.id)
+  const last = g[g.length - 1]
+  const t0 = today()
+  const late = w.open.filter((t) => t.due_date && t.due_date < t0).length
+  const pct = w.total ? w.done / w.total : termPct(c) ?? 0
+  return (
+    <a class="ctile" href={`#/school/c-${codeSlug(c.code)}`} style={`--c:${tint(c, i)}`}>
+      <div class="row between"><b>{c.code}</b>{last ? <span class="ctile-grade">{last.letter ?? letterFor(last.estimate ?? 0)}</span> : <Ring value={pct} size={34} stroke={4} color={tint(c, i)} />}</div>
+      <div class="ellipsis muted small">{c.name}</div>
+      <div class="c-meta">{w.total ? `${w.done} of ${w.total} done` : `${Math.round(pct * 100)}% of term`}{w.open.length ? ` · ${w.open.length} open` : ''}{late ? <span style="color:var(--coral)"> · {late} late</span> : null}</div>
+    </a>
+  )
+}
 
 // ---------- overview ----------
 function Overview() {
   const courses = useRows<Course>('courses')
   const reqs = useRows<Req>('degree_reqs')
-  const tasks = useStore((s) => s.tasks)
   const cur = (courses ?? []).filter((c) => c.status === 'current')
   const pct = cur.length ? termPct(cur[0]) : null
   const left = cur[0]?.ends_on ? daysUntil(cur[0].ends_on) : null
@@ -72,7 +149,6 @@ function Overview() {
   const done = main.filter((r) => r.status === 'done' || r.status === 'waived').reduce((a, r) => a + Number(r.credits ?? 0), 0)
   const prog = main.filter((r) => r.status === 'in_progress').reduce((a, r) => a + Number(r.credits ?? 0), 0)
   const open = main.filter((r) => r.status === 'open' || r.status === 'pending').length
-  const t0 = today()
   return (
     <>
       {cur.length > 0 && (
@@ -82,21 +158,10 @@ function Overview() {
         </section>
       )}
       <div class="ctiles">
-        {cur.map((c, i) => {
-          const mine = tasks.filter((t) => courseOf(t) === c.code)
-          const openT = mine.filter(openTask)
-          const late = openT.filter((t) => t.due_date && t.due_date < t0).length
-          const doneN = mine.length - openT.length
-          return (
-            <a class="ctile" href={`#/school/c-${codeSlug(c.code)}`} style={`--c:${tint(c, i)}`}>
-              <div class="row between"><b>{c.code}</b><Ring value={mine.length ? doneN / mine.length : 0} size={34} stroke={4} color={tint(c, i)} /></div>
-              <div class="ellipsis muted small">{c.name}</div>
-              <div class="c-meta">{openT.length ? `${openT.length} open` : 'All caught up'}{late ? <span style="color:var(--coral)"> · {late} late</span> : null}</div>
-            </a>
-          )
-        })}
+        {cur.map((c, i) => <ClassTile c={c} i={i} />)}
       </div>
       <SchoolPanel />
+      {reqs && <Journey reqs={main} />}
       {reqs && (
         <a class="card prompt" href="#/school/degree" style="--accent:var(--gold)">
           <span class="orb"><Icon name="degree" size={22} /></span>
@@ -104,6 +169,29 @@ function Overview() {
         </a>
       )}
     </>
+  )
+}
+
+/** The long view: credits behind you, this term, and what's left, from the degree plan and past schools. */
+function Journey({ reqs }: { reqs: Req[] }) {
+  const schools = useRows<School>('edu_schools')
+  const hist = useRows<HistCourse>('edu_courses')
+  const items = reqs.filter((r) => r.grp !== 'Open items')
+  const sum = (f: (r: Req) => boolean) => items.filter(f).reduce((a, r) => a + Number(r.credits ?? 0), 0)
+  const done = sum((r) => r.status === 'done' || r.status === 'waived'), now = sum((r) => r.status === 'in_progress'), later = sum((r) => r.status === 'planned' || r.status === 'pending'), need = sum((r) => r.status === 'needed')
+  const total = done + now + later + need
+  if (!total) return null
+  const college = (schools ?? []).filter((s) => s.kind !== 'high_school')
+  const past = (hist ?? []).filter((h) => college.some((s) => s.id === h.school_id))
+  const g = gpa(past)
+  const seg = (v: number, c: string) => <i style={`width:${(v / total) * 100}%;background:${c}`} />
+  return (
+    <section class="card">
+      <div class="row between"><h2>{Math.round(((done + now) / total) * 100)}% of the way</h2><a class="faint small" href="#/school/history">History</a></div>
+      <div class="stackbar" style="margin:12px 0 8px">{seg(done, 'var(--mint)')}{seg(now, 'var(--sky)')}{seg(later, 'var(--lilac)')}</div>
+      <div class="legend"><span><i class="dot" style="background:var(--mint)" />{done} done</span><span><i class="dot" style="background:var(--sky)" />{now} this term</span><span><i class="dot" style="background:var(--lilac)" />{later} planned</span><span><i class="dot" style="background:var(--faint)" />{need} to go</span></div>
+      {(past.length > 0 || g != null) && <p class="faint small" style="margin-top:8px">{past.length} college courses behind you{g != null ? `, ${g.toFixed(2)} GPA across them` : ''}.</p>}
+    </section>
   )
 }
 
@@ -115,6 +203,7 @@ function ClassPage({ code }: { code: string }) {
   const i = (courses ?? []).findIndex((c) => c.code === code)
   const c = courses?.[i]
   const mine = tasks.filter((t) => courseOf(t) === code)
+  const work = useWork(code)
   const openT = mine.filter(openTask).sort((a, b) => (a.due_date ?? '9').localeCompare(b.due_date ?? '9'))
   const dates = (kd ?? []).filter((k) => k.course?.replace(/[-\s]/g, '') === code.replace(/\s/g, '') && k.day >= today())
   const color = c ? tint(c, i) : 'var(--lilac)'
@@ -124,12 +213,13 @@ function ClassPage({ code }: { code: string }) {
       <PageHead title={code} sub={c?.name ?? undefined} back="#/school" icon="school" color={color} />
       {c && (
         <div class="stats3">
-          <div><b>{mine.length ? Math.round(((mine.length - openT.length) / mine.length) * 100) : 0}%</b><span>of tasks done</span></div>
+          <div><b>{work.total ? `${work.done}/${work.total}` : '–'}</b><span>assignments behind you</span></div>
           <div><b>{termPct(c) != null ? Math.round(termPct(c)! * 100) : '–'}%</b><span>through the term</span></div>
           <div><b>{c.credits ?? '–'}</b><span>credits</span></div>
         </div>
       )}
       {c && (c.instructor || c.meets) && <p class="muted small" style="margin:0 4px 14px">{[c.instructor, c.meets].filter(Boolean).join(' · ')}</p>}
+      {c && <GradeCard course={c} color={color} />}
       {dates.length > 0 && <Card title="Key dates" icon="flame" accent="var(--pink)">{dates.map((k) => <div class="row between" style="padding:7px 0;border-bottom:1px solid var(--line)"><span>{k.title}{k.kind === 'exam' && <span class="pill" style="--c:var(--pink);margin-left:6px">Exam</span>}</span><span class="faint small">{fmtDay(k.day)}</span></div>)}</Card>}
       {[...KINDS, { key: 'other', label: 'Other' }].map((k) => {
         const g = openT.filter((t) => kindOf(t) === k.key)

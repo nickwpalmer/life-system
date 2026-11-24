@@ -3,6 +3,20 @@
 Life is a personal app. Its code lives in this public repository; its **data lives in Supabase** (Postgres) and never in this repo.
 Read this before you add, change or delete anything in the database, whatever tool you use (Supabase connector, SQL, REST).
 
+## Before any write: read the inbox
+
+The owner leaves notes for Claude in `claude_inbox`, from the app's "Claude's changes" screen. **Before you add, change or delete anything, read the open ones:**
+
+```sql
+select id, kind, change_id, body, created_at from claude_inbox where status = 'open' order by created_at;
+```
+
+- `kind='note'`: an instruction or correction from the owner. Do what it says (within these rules), then mark it handled:
+  `update claude_inbox set status='done', reply='What you did, in a sentence', done_at=now() where id=...;`
+- `kind='undo'` with `status='open'`: the owner asked to undo a change and the app couldn't. Undo it (put the `before` values from `change_log` back, or remove the row you added), then mark it done with a reply.
+- `kind='undo'` with `status='done'`: the owner already undid that change. **Don't redo it** (or anything like it) unless the owner asks again. Check these before repeating any earlier batch of changes.
+- Don't delete inbox rows. Writes to `claude_inbox` aren't logged in `change_log`.
+
 ## Ground rules
 
 1. **Never put personal data in this repository.** No schedules, money, school records, names or IDs in code, commits or demo data. Demo data (`src/lib/demo.ts`, `registerDemo(...)`) stays generic.
@@ -24,14 +38,17 @@ Read this before you add, change or delete anything in the database, whatever to
 | Something to do | `tasks` | `status='inbox'` if it needs sorting, `'open'` if clear. `source='claude'`. |
 | A feeling, reflection, story | `journal_entries` | `body`, optional `title`, `mood` 1 to 10, `occurred_at` = when it happened. See Journal. |
 | A number for the day (slept 7h, mood 6) | `logs` | Daily entry; see Logs. |
-| Something taken (coffee, a drink, a supplement) | `substance_logs` | `substance`, `amount`, `unit`, `occurred_at`; `time_known=false` if no time given (use local noon). |
+| Something taken (coffee, a drink, a supplement) | `substance_logs` | `substance`, `amount`, `unit`, `occurred_at`; `time_known=false` if no time given (use local noon). See Substances. |
 | A document or ID-type fact (insurance, registration, W-2) | `records` | See Records. |
 | A reference note, list or how-to | `notes` | `title`, `body`. |
-| A person, birthday, keep-in-touch | `people` | `name`, `relation`, `birthday`, `contact_every_days`, `last_contact`. |
+| A person, birthday, keep-in-touch | `people` | `name`, `relation`, `org`, `phone`, `email`, `birthday`, `contact_every_days`, `last_contact`, `notes`. Names in task titles link to the person's card, so use the same spelling. |
 | An outcome they want | `goals` | `status='active'`; if you're proposing it rather than they stated it, `suggested=true`. |
 | A school deadline, exam or term date | `key_dates` | `kind` in deadline, exam, term, event; `area_key='education'`; `course` like `MAT 2010`. |
 | A class taken, grade, transfer credit | `edu_courses` / `courses` / `degree_reqs` | History, current or planned classes, degree plan. |
 | A scholarship or grant | `scholarships` | `status` in maybe, to_apply, applied, awarded, declined, missed. |
+| A grade estimate for a current class | `grade_logs` | `course_id` (from `courses`), `estimate` (percent), `letter`, `note`, `logged_at`. One new row per estimate; it's a log over time. |
+| Something they own (apartment, clothes, electronics) | `inventory_items` | `list` (the inventory's name, e.g. `Electronics`), `name`, `qty`, `category` (group within the list), `location`, `value` (each, $), `acquired_on`, `notes`. |
+| A longer analysis of their data | `reports` | See Reports. |
 
 Areas (`areas.key`): `education`, `mental`, `finances`, `health`, `work`, `relationships`, `growth`, `home`. Put `area_id` on tasks, notes, goals and journal entries when the area is clear.
 
@@ -45,11 +62,17 @@ Areas (`areas.key`): `education`, `mental`, `finances`, `health`, `work`, `relat
 
 ## Logs (daily numbers)
 
-- Each tracked thing is a row in `metrics` (look it up by `key`): mood, anxiety, energy (scale 1 to 10), sleep_hours (h), sleep_score, hrv (ms), resting_hr (bpm), steps, exercise, meditation, study, reading (min), water (glasses), screen_time (h), spend ($). The owner can add more.
+- Each tracked thing is a row in `metrics` (look it up by `key`): mood, anxiety (shown as "Stress / anxiety"), energy (scale 1 to 10), sleep_hours (h), sleep_score, hrv (ms), resting_hr (bpm), steps, exercise, meditation, study, reading (min), water (glasses), spend ($). The owner can add more. Metrics with `active=false` are off; don't log to them.
+- Mood and stress can be logged many times a day as timed entries; that's expected.
 - **Whole-day value:** one row per metric per day, `source='daily'`, `occurred_at` = **local noon** of that day (12:00 America/Detroit). If a daily row already exists for that metric and day, update it; don't add a second one.
 - **Timed value** (a mood right now, a workout at 6 PM): `source='app'` or `'claude'`, `occurred_at` = the actual time.
 - Apple Health writes `source='health'` through RPC `ingest_health`. Don't write those by hand.
 - `value_num` for numbers, `value_text` for text metrics, `note` for context.
+
+## Substances
+
+- `substance` is the plain name only: `Caffeine`, `THC`, `Semax + Selank`, `NAD+`. Put the product or route in `note` ("Monster strawberry shot", "Neuro Strip, sublingual", "Injection"). Don't put the time in the note; use `occurred_at` and `time_known`.
+- Use the name already in the table for that substance (check `select distinct substance from substance_logs`) so entries group together.
 
 ## Journal
 
@@ -63,6 +86,11 @@ Areas (`areas.key`): `education`, `mental`, `finances`, `health`, `work`, `relat
 - Only set `expires_on` when there is a real date. Records with no date never show as expired.
 - Files are not uploaded to the app. Link to them in Google Drive.
 
+## Reports
+
+- The Insights page has an "AI analysis" section that shows rows from `reports`, newest first. Write about one a week when asked: `title`, `period_start`, `period_end`, `body`, `author='claude'`.
+- `body` is plain text: `## ` headings, `- ` bullets, blank lines between paragraphs. No HTML, links or tables. Write to the owner, say what the data shows and what you're unsure of, and keep it to what their data supports.
+
 ## Calendar and money
 
 - `calendar_events` is a copy of Google Calendar, refreshed automatically. Don't edit it; change the real calendar instead.
@@ -75,7 +103,7 @@ Areas (`areas.key`): `education`, `mental`, `finances`, `health`, `work`, `relat
 
 ## Owner settings
 
-`profiles.settings.prefs` holds app preferences (theme, logo, bottom-bar tabs, Home time windows, calendar layers, `calRoles` mapping each Google calendar name to personal, work, classes, assignments or important). Merge into it with `jsonb_set` / `||`; never overwrite the whole `settings` object.
+`profiles.settings.prefs` holds app preferences (theme, logo, bottom-bar tabs, Home time windows, calendar layers, `calRoles` mapping each Google calendar name to personal, work, classes, assignments or important (shown as "Time blocks"), `commute` {school, work} in minutes each way, and `pay` {rate, tips} per hour for the work pay estimate). Merge into it with `jsonb_set` / `||`; never overwrite the whole `settings` object.
 
 ## Backups
 

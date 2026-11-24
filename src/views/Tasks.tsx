@@ -5,9 +5,23 @@ import { parseQuick } from '../lib/parse'
 import { today, inDays, fmtDay, fmtClock, daysUntil, weekStart, dayKey, addDays } from '../lib/dates'
 import type { Task, TaskStatus } from '../lib/types'
 import { Icon } from '../ui/icons'
-import { Sheet, PageHead, burst, haptic } from '../ui/kit'
+import { Sheet, PageHead, burst, haptic, SortBtn, useSort } from '../ui/kit'
+import { PeopleText } from './People'
 
 export const openTask = (t: Task) => t.status !== 'done' && t.status !== 'dropped'
+
+/** "Do it by" shortcuts: end of this week (Sunday) and end of this month. */
+export const endOfWeek = () => dayKey(addDays(weekStart(), 6))
+export const endOfMonth = () => { const d = new Date(); return dayKey(new Date(d.getFullYear(), d.getMonth() + 1, 0)) }
+export const BY: [string, () => string | null][] = [['Today', today], ['Tomorrow', () => inDays(1)], ['This week', endOfWeek], ['This month', endOfMonth], ['No date', () => null]]
+
+type SortK = 'due' | 'priority' | 'newest' | 'oldest'
+export const TASK_SORTS: [SortK, string][] = [['due', 'Due date'], ['priority', 'Priority'], ['newest', 'Newest'], ['oldest', 'Oldest']]
+export const sortTasks = (k: SortK) => (a: Task, b: Task) =>
+  k === 'priority' ? b.priority - a.priority || (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999')
+  : k === 'newest' ? b.created_at.localeCompare(a.created_at)
+  : k === 'oldest' ? a.created_at.localeCompare(b.created_at)
+  : (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999') || (a.due_time ?? '').localeCompare(b.due_time ?? '') || b.priority - a.priority
 
 export function dueLabel(t: Task) {
   if (!t.due_date) return null
@@ -32,7 +46,7 @@ export function TaskRow({ t, onOpen, process }: { t: Task; onOpen: (t: Task) => 
     <div class={`task ${done ? 'done' : ''}`}>
       <button class={`check p${t.priority} ${done ? 'on' : ''}`} aria-label={done ? 'Mark not done' : 'Mark done'} onClick={toggle}><Icon name="check" size={15} stroke={3} /></button>
       <div class="grow" onClick={() => onOpen(t)} style="cursor:pointer">
-        <div class="t-title">{t.title}</div>
+        <div class="t-title"><PeopleText text={t.title} /></div>
         <div class="t-meta">
           {dueLabel(t)}
           {a && <span class="pill" style={`--c:${a.color}`}>{a.name}</span>}
@@ -42,12 +56,11 @@ export function TaskRow({ t, onOpen, process }: { t: Task; onOpen: (t: Task) => 
         </div>
         {process && !done && (
           <div class="process" onClick={(e) => e.stopPropagation()}>
-            <button onClick={() => file({ due_date: today() }, 'Moved to today')}>Today</button>
-            <button onClick={() => file({ due_date: inDays(1) }, 'Moved to tomorrow')}>Tomorrow</button>
-            <button onClick={() => file({ due_date: dayKey(addDays(weekStart(), 7)) }, 'Moved to next week')}>Next week</button>
-            <button onClick={() => file({}, 'Filed, no date')}>No date</button>
+            <span class="p-l">Do by</span>
+            {BY.map(([l, d]) => <button onClick={() => { const v = d(); file({ due_date: v }, v ? `Do by ${fmtDay(v).toLowerCase() === 'today' ? 'today' : fmtDay(v)}` : 'Filed, no date') }}>{l}</button>)}
             <button onClick={() => file({ tags: [...(t.tags ?? []), 'someday'] }, 'Moved to someday')}>Someday</button>
-            <button onClick={() => onOpen(t)}>Edit</button>
+            <span class="p-l">Priority</span>
+            {([[1, 'Low'], [2, 'Med'], [3, 'High']] as const).map(([p, l]) => <button class={t.priority === p ? 'on' : ''} onClick={() => update('tasks', t.id, { priority: t.priority === p ? 0 : p }).catch(() => {})}>{l}</button>)}
           </div>
         )}
       </div>
@@ -79,11 +92,11 @@ export function TaskSheet({ task, onClose }: { task: Task | null; onClose: () =>
       <input class="input title bare" value={f.title ?? ''} onInput={(e) => setF({ ...f, title: (e.target as HTMLInputElement).value })} />
       <textarea class="input" style="margin:8px 0 14px;min-height:70px" placeholder="Notes, links, next step…" value={f.notes ?? ''} onInput={(e) => setF({ ...f, notes: (e.target as HTMLTextAreaElement).value })} />
       <div class="row">
-        <label class="field grow"><span>Due</span><input class="input" type="date" value={f.due_date ?? ''} onInput={(e) => setF({ ...f, due_date: (e.target as HTMLInputElement).value || null })} /></label>
+        <label class="field grow"><span>Do by</span><input class="input" type="date" value={f.due_date ?? ''} onInput={(e) => setF({ ...f, due_date: (e.target as HTMLInputElement).value || null })} /></label>
         <label class="field" style="width:42%"><span>Time</span><input class="input" type="time" value={f.due_time?.slice(0, 5) ?? ''} onInput={(e) => setF({ ...f, due_time: (e.target as HTMLInputElement).value || null })} /></label>
       </div>
       <div class="chips" style="margin:-4px 0 14px">
-        {[['Today', today()], ['Tomorrow', inDays(1)], ['Next week', dayKey(addDays(weekStart(), 7))], ['No date', null]].map(([l, d]) => <button class={`chip ${f.due_date === d ? 'on' : ''}`} onClick={() => setF({ ...f, due_date: d })}>{l}</button>)}
+        {BY.map(([l, fn]) => { const d = fn(); return <button class={`chip ${f.due_date === d ? 'on' : ''}`} onClick={() => setF({ ...f, due_date: d })}>{l}</button> })}
       </div>
       <div class="field"><span>Area</span><div class="chips">{areas.map((a) => <button class={`chip ${f.area_id === a.id ? 'on' : ''}`} style={`--c:${a.color}`} onClick={() => setF({ ...f, area_id: f.area_id === a.id ? null : a.id })}><i class="dot" style={`background:${a.color}`} />{a.name}</button>)}</div></div>
       <div class="field"><span>Priority</span><div class="chips">{[['None', 0, 'var(--faint)'], ['Low', 1, 'var(--sky)'], ['Medium', 2, 'var(--orange)'], ['High', 3, 'var(--coral)']].map(([l, p, c]) => <button class={`chip ${f.priority === p ? 'on' : ''}`} style={`--c:${c}`} onClick={() => setF({ ...f, priority: p as number })}>{l}</button>)}</div></div>
@@ -99,9 +112,10 @@ export function TaskSheet({ task, onClose }: { task: Task | null; onClose: () =>
 }
 
 /** Quick add bar: understands dates, times, !priority and #area as you type. */
-export function AddTask({ defaults, placeholder = 'Add a task… try “essay fri 5pm #education”' }: { defaults?: Partial<Task>; placeholder?: string }) {
+export function AddTask({ defaults, placeholder = 'Add a task' }: { defaults?: Partial<Task>; placeholder?: string }) {
   const areas = useStore((s) => s.areas)
   const [v, setV] = useState('')
+  const [focus, setFocus] = useState(false)
   const p = parseQuick(v, areas)
   async function add(e: Event) {
     e.preventDefault()
@@ -116,10 +130,10 @@ export function AddTask({ defaults, placeholder = 'Add a task… try “essay fr
   return (
     <form onSubmit={add} style="margin-bottom:14px">
       <div class="add-row">
-        <input class="input" placeholder={placeholder} value={v} onInput={(e) => setV((e.target as HTMLInputElement).value)} />
-        <button class="icon-btn" style="width:48px;height:48px;background:var(--grad);color:#1d1330;border:0" aria-label="Add task"><Icon name="plus" stroke={2.6} /></button>
+        <input class="input" placeholder={placeholder} value={v} onFocus={() => setFocus(true)} onBlur={() => setTimeout(() => setFocus(false), 150)} onInput={(e) => setV((e.target as HTMLInputElement).value)} />
+        {v.trim() && <button class="icon-btn add-go" aria-label="Add task"><Icon name="plus" stroke={2.6} /></button>}
       </div>
-      <p class="hint">{v.trim() && (p.due_date || a || p.priority) ? <>{p.due_date && <><b>{fmtDay(p.due_date)}</b>{p.due_time ? <> {fmtClock(p.due_time)}</> : null} </>}{a && <><b>{a.name}</b> </>}{p.priority ? <b>{p.priority === 3 ? 'high' : 'medium'} priority</b> : null}</> : ''}</p>
+      {(focus || v.trim()) && <p class="hint">{v.trim() && (p.due_date || a || p.priority) ? <>{p.due_date && <><b>{fmtDay(p.due_date)}</b>{p.due_time ? <> {fmtClock(p.due_time)}</> : null} </>}{a && <><b>{a.name}</b> </>}{p.priority ? <b>{p.priority === 3 ? 'high' : 'medium'} priority</b> : null}</> : 'Add a day, time or #area, like “essay fri 5pm #education”.'}</p>}
     </form>
   )
 }
@@ -144,9 +158,10 @@ function AreaTasks({ areaKey }: { areaKey: string }) {
   const tasks = useStore((s) => s.tasks)
   const area = useStore((s) => s.areas.find((a) => a.key === areaKey))
   const [edit, setEdit] = useState<Task | null>(null)
+  const [sort, setSort] = useSort<SortK>('area-tasks', 'due')
   const t0 = today()
   const mine = tasks.filter((t) => openTask(t) && t.status !== 'inbox' && (areaKey === 'none' ? !t.area_id : t.area_id === area?.id))
-  const byDue = (a: Task, b: Task) => (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999') || b.priority - a.priority
+  const byDue = sortTasks(sort)
   const row = (t: Task) => <TaskRow t={t} onOpen={setEdit} />
   const doneWeek = tasks.filter((t) => t.status === 'done' && (areaKey === 'none' ? !t.area_id : t.area_id === area?.id) && t.completed_at && dayKey(new Date(t.completed_at)) >= dayKey(addDays(new Date(), -7))).length
   let body
@@ -163,7 +178,7 @@ function AreaTasks({ areaKey }: { areaKey: string }) {
     const late = mine.filter((t) => t.due_date && t.due_date < t0).sort(byDue)
     const now = mine.filter((t) => t.due_date === t0 || t.scheduled_for === t0 || t.status === 'doing')
     const later = mine.filter((t) => t.due_date && t.due_date > t0 && !now.includes(t)).sort(byDue)
-    const any = mine.filter((t) => !t.due_date && !now.includes(t)).sort((a, b) => b.priority - a.priority)
+    const any = mine.filter((t) => !t.due_date && !now.includes(t)).sort(sort === 'due' ? sortTasks('priority') : byDue)
     body = <section class="card" style={`--accent:${area?.color ?? 'var(--violet)'}`}>
       {([['Overdue', late], ['Today', now], ['Coming up', later], ['Anytime', any]] as const).map(([l, g]) => g.length ? <><div class="group-h"><span>{l}</span><span>{g.length}</span></div>{g.map(row)}</> : null)}
       {!mine.length && <p class="empty">Nothing open here.</p>}
@@ -171,7 +186,7 @@ function AreaTasks({ areaKey }: { areaKey: string }) {
   }
   return (
     <>
-      <PageHead title={area?.name ?? 'No area'} sub={`${mine.length} open · ${doneWeek} done this week`} back="#/tasks" icon="tasks" color={area?.color ?? 'var(--violet)'} />
+      <PageHead title={area?.name ?? 'No area'} sub={`${mine.length} open · ${doneWeek} done this week`} back="#/tasks" icon="tasks" color={area?.color ?? 'var(--violet)'} action={<SortBtn value={sort} options={TASK_SORTS} onChange={setSort} />} />
       <AddTask defaults={{ area_id: area?.id ?? null, status: 'open' }} placeholder={`Add to ${area?.name ?? 'tasks'}…`} />
       {body}
       <TaskSheet task={edit} onClose={() => setEdit(null)} />
@@ -216,22 +231,23 @@ function TaskLists({ initial }: { initial?: View }) {
   const inboxN = tasks.filter((t) => t.status === 'inbox').length
   const [view, setView] = useState<View>(initial ?? 'home')
   const [edit, setEdit] = useState<Task | null>(null)
+  const [sort, setSort] = useSort<SortK>('tasks', 'due')
   const t0 = today()
   const open = tasks.filter(openTask)
   const active = open.filter((t) => t.status !== 'inbox' && !t.tags?.includes('someday'))
-  const byDue = (a: Task, b: Task) => (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999') || (a.due_time ?? '').localeCompare(b.due_time ?? '') || b.priority - a.priority
+  const byDue = sortTasks(sort)
   const todayList = active.filter((t) => t.due_date && t.due_date <= t0 || t.status === 'doing').sort(byDue)
-  const upcoming = active.filter((t) => t.due_date && t.due_date > t0).sort(byDue)
-  const nodate = active.filter((t) => !t.due_date && t.status !== 'doing').sort((a, b) => b.priority - a.priority)
+  const upcoming = active.filter((t) => t.due_date && t.due_date > t0).sort(sortTasks('due'))
+  const nodate = active.filter((t) => !t.due_date && t.status !== 'doing').sort(sort === 'due' ? sortTasks('priority') : byDue)
   const row = (t: Task) => <TaskRow t={t} onOpen={setEdit} process={view === 'inbox'} />
 
   const tabs: [View, string, number?][] = [['home', 'Overview'], ['inbox', 'Inbox', inboxN], ['today', 'Today', todayList.length], ['upcoming', 'Upcoming'], ['someday', 'Someday'], ['done', 'Done']]
   let body
   if (view === 'home') body = <Overview go={setView} />
   else if (view === 'inbox') {
-    const inbox = open.filter((t) => t.status === 'inbox').sort((a, b) => a.created_at.localeCompare(b.created_at))
+    const inbox = open.filter((t) => t.status === 'inbox').sort(sort === 'due' ? sortTasks('oldest') : byDue)
     body = <section class="card">
-      <p class="muted small" style="margin-bottom:6px">Give each one a home: a day, or no date. If it takes two minutes, just do it.</p>
+      <p class="muted small" style="margin-bottom:6px">Tap when you want it done by, and a priority if it matters. Tap the task itself for everything else.</p>
       {inbox.length ? inbox.map(row) : <p class="empty">Inbox zero. Anything you capture lands here first.</p>}
     </section>
   } else if (view === 'today') {
@@ -244,7 +260,7 @@ function TaskLists({ initial }: { initial?: View }) {
     for (const t of upcoming) { const k = t.due_date!; groups.set(k, [...(groups.get(k) ?? []), t]) }
     body = <section class="card">{upcoming.length ? [...groups].map(([d, ts]) => <><div class="group-h"><span>{fmtDay(d)}</span><span>{daysUntil(d)}d</span></div>{ts.map(row)}</>) : <p class="empty">Nothing scheduled ahead.</p>}</section>
   } else if (view === 'someday') {
-    const s = open.filter((t) => t.tags?.includes('someday'))
+    const s = open.filter((t) => t.tags?.includes('someday')).sort(byDue)
     body = <section class="card"><p class="muted small" style="margin-bottom:6px">Ideas you’re not committing to yet. Look through them in your weekly review.</p>{s.length ? s.map(row) : <p class="empty">Nothing parked here.</p>}</section>
   } else {
     const since = dayKey(addDays(new Date(), -14))
@@ -256,8 +272,11 @@ function TaskLists({ initial }: { initial?: View }) {
     <>
       <PageHead title="Tasks" icon="tasks" color="var(--violet)" />
       <AddTask defaults={view === 'today' ? { due_date: t0 } : view === 'inbox' ? { status: 'inbox' } : undefined} />
-      <div class="chips scroll" style="margin-bottom:14px">
+      <div class="row" style="gap:8px;margin-bottom:14px;align-items:center">
+      <div class="chips scroll grow" style="margin:0">
         {tabs.map(([v, l, n]) => <button class={`chip ${view === v ? 'on' : ''}`} onClick={() => setView(v)}>{l}{n ? <span class={`badge ${v === 'inbox' ? '' : 'quiet'}`} style="height:18px;min-width:18px;font-size:11px">{n}</span> : null}</button>)}
+      </div>
+      {view !== 'home' && view !== 'upcoming' && view !== 'done' && <SortBtn value={sort} options={TASK_SORTS} onChange={setSort} />}
       </div>
       {body}
       <TaskSheet task={edit} onClose={() => setEdit(null)} />

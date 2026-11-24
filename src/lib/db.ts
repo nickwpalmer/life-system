@@ -47,7 +47,7 @@ export function clearData() { setState({ ...emptyData(), loaded: false }) }
 /** Refresh when the app comes back to the foreground, so Claude's writes show up. */
 export function installRefresh() {
   document.addEventListener('visibilitychange', () => {
-    if (document.visibilityState === 'visible' && getState().session) bootstrap().catch(() => {})
+    if (document.visibilityState === 'visible' && getState().session) { bootstrap().catch(() => {}); import('./rows').then((m) => m.reloadAll()) }
   })
   setInterval(() => { if (document.visibilityState === 'visible' && getState().session) bootstrap().catch(() => {}) }, 5 * 60_000)
 }

@@ -14,8 +14,10 @@ export type Prefs = {
   sleepDefault: number
   /** What each Google calendar is, by its name. Unlisted calendars are guessed from the name. */
   calRoles: Record<string, CalRole>
-  /** Shows a sample record as active, ending soon and expired at the top of Records. Temporary. */
-  previewExpiry: boolean
+  /** Travel time each way, in minutes, added around class days and shifts in the Free time, Work and School views. */
+  commute: { school: number; work: number }
+  /** For the work pay estimate. Hourly rate and average tips per hour, before tax. */
+  pay: { rate: number | null; tips: number | null }
 }
 export type CalRole = 'personal' | 'work' | 'classes' | 'assignments' | 'important'
 export type LogoKey = 'classic' | 'sunset' | 'night' | 'mono' | 'glass'
@@ -28,7 +30,8 @@ export const DEFAULT_PREFS: Prefs = {
   cal: { personal: true, work: true, classes: true, assignments: false, important: true },
   sleepDefault: 7,
   calRoles: {},
-  previewExpiry: false,
+  commute: { school: 0, work: 0 },
+  pay: { rate: null, tips: null },
 }
 
 const merge = (p: Partial<Prefs> | undefined): Prefs => ({
@@ -36,6 +39,8 @@ const merge = (p: Partial<Prefs> | undefined): Prefs => ({
   windows: { ...DEFAULT_PREFS.windows, ...p?.windows },
   cal: { ...DEFAULT_PREFS.cal, ...p?.cal },
   calRoles: { ...p?.calRoles },
+  commute: { ...DEFAULT_PREFS.commute, ...p?.commute },
+  pay: { ...DEFAULT_PREFS.pay, ...p?.pay },
   tabs: p?.tabs?.length === 3 ? p.tabs : DEFAULT_PREFS.tabs,
 })
 

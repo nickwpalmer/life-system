@@ -65,9 +65,9 @@ export function SchoolPanel() {
   const shown = showAll ? due : due.filter((d) => daysUntil(d.day) <= 14 || d.kind === 'exam').slice(0, 10)
   return <>
     <div class="stat-row">
-      <div class="stat" style="--c:var(--lilac)"><div class="s-val">{soon.length}</div><div class="s-lbl">due in 2 weeks</div></div>
-      <div class="stat" style="--c:var(--pink)"><div class="s-val">{exam ? daysUntil(exam.day) : '–'}</div><div class="s-lbl ellipsis">{exam ? `days to ${exam.course ?? exam.title}` : 'no exams set'}</div></div>
-      <div class="stat" style="--c:var(--mint)"><div class="s-val">{termEnd ? daysUntil(termEnd.day) : '–'}</div><div class="s-lbl">days of class left</div></div>
+      <div class="stat" style="--c:var(--lilac)"><div class="s-val">{soon.length}</div><div class="s-lbl">due in the next 2 weeks</div>{soon[0] && <div class="s-date">next {fmtWeekday(soon[0].day)} {fmtShort(soon[0].day)}</div>}</div>
+      <div class="stat" style="--c:var(--pink)"><div class="s-val">{exam ? daysUntil(exam.day) : '–'}</div><div class="s-lbl">{exam ? `days to ${exam.course ? `${exam.course} exam` : exam.title}` : 'no exams set'}</div>{exam && <div class="s-date">{fmtWeekday(exam.day)} {fmtShort(exam.day)}</div>}</div>
+      <div class="stat" style="--c:var(--mint)"><div class="s-val">{termEnd ? daysUntil(termEnd.day) : '–'}</div><div class="s-lbl">days of class left</div>{termEnd && <div class="s-date">ends {fmtShort(termEnd.day)}</div>}</div>
     </div>
     <Card title="Due" icon="clock" accent="var(--lilac)" action={due.length > shown.length || showAll ? <button class="link" onClick={() => setShowAll(!showAll)}>{showAll ? 'Less' : 'All'}</button> : undefined}>
       {shown.length ? shown.map((d, i) => <>

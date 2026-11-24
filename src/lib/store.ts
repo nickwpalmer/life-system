@@ -22,6 +22,8 @@ type State = Data & {
   /** Capture sheet: false, true, or the mode to open it in. */
   capture: boolean | 'task' | 'journal' | 'note' | 'mood'
   substance: boolean
+  /** Person sheet: the id of the person to show, from anywhere their name appears. */
+  person: string | 'new' | null
 }
 
 export const emptyData = (): Data => ({
@@ -29,7 +31,7 @@ export const emptyData = (): Data => ({
   goals: [], people: [], reviews: [], events: [], synced_at: null,
 })
 
-let state: State = { ...emptyData(), session: null, ready: false, loaded: false, locked: false, demo: false, toast: null, capture: false, substance: false }
+let state: State = { ...emptyData(), session: null, ready: false, loaded: false, locked: false, demo: false, toast: null, capture: false, substance: false, person: null }
 const subs = new Set<() => void>()
 let queued = false
 
