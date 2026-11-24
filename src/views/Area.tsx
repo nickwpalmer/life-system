@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'preact/hooks'
 import { useStore, areaByKey } from '../lib/store'
-import { lastNDays, fmtDay, dayKey } from '../lib/dates'
+import { lastNDays, fmtDay, dayKey, today } from '../lib/dates'
 import { dailySeries, fmtValue, consistency } from '../lib/metrics'
 import type { Task, Metric } from '../lib/types'
 import { PageHead, Card, Ring, Sheet } from '../ui/kit'
@@ -34,7 +34,7 @@ function Education({ tasks, onOpen }: { tasks: Task[]; onOpen: (t: Task) => void
   return <>
     {courses.size > 0 && <div class="tiles">{[...courses].map(([c, ts]) => {
       const next = ts.filter((t) => t.due_date).sort((a, b) => a.due_date!.localeCompare(b.due_date!))[0]
-      return <div class="tile" style="--c:var(--lilac)"><div class="t-name">{c}</div><div class="t-sub">{ts.length} open{next ? ` · next ${fmtDay(next.due_date!).toLowerCase()}` : ''}</div></div>
+      return <div class="tile" style="--c:var(--lilac)"><div class="t-name">{c}</div><div class="t-sub">{ts.length} open{next ? (next.due_date! < today() ? ' · overdue' : ` · next ${fmtDay(next.due_date!).toLowerCase()}`) : ''}</div></div>
     })}</div>}
   </>
 }
