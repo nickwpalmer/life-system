@@ -106,9 +106,9 @@ export function LogGroups({ day, only, compact }: { day: string; only?: string[]
         const ms = metrics.filter((m) => groupOf(m) === g.key)
         if (!ms.length) return null
         const body = ms.map((m) => <LogRow m={m} day={day} onTimed={setTimed} />)
-        const open = g.key === 'vices' ? ms.filter((m) => dailySeries(m, logs, [day])[0] == null) : []
+        const open = g.key === 'vices' ? ms.filter((m) => m.kind === 'count' && dailySeries(m, logs, [day])[0] == null) : []
         const clear = open.length > 0 && (
-          <button class="chip small" style="margin-left:auto" onClick={() => { haptic(); open.forEach((m) => setDaily(m, day, 0)); toast(`Logged none for ${open.length === ms.length ? 'all vices' : open.map((m) => m.name.toLowerCase()).join(', ')}`) }}>
+          <button class="chip small" style="margin-left:auto" onClick={() => { haptic(); open.forEach((m) => setDaily(m, day, 0)); toast(`Logged none for ${open.length === ms.filter((m) => m.kind === 'count').length ? 'all vices' : open.map((m) => m.name.toLowerCase()).join(', ')}`) }}>
             <Icon name="check" size={14} /> None {day === today() ? 'today' : 'that day'}
           </button>
         )

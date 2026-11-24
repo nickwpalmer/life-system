@@ -46,9 +46,11 @@ function WelcomeBack() {
     ...logs.filter((l) => l.source === 'daily' || l.source === 'app').map((l) => dayKey(new Date(l.occurred_at))),
     ...checkins.map((c) => c.day),
     ...tasks.filter((x) => x.completed_at).map((x) => dayKey(new Date(x.completed_at!))),
-  ].filter((d) => d < t)
-  if (gone || !days.length || days.some((d) => d === t)) return null
-  const last = days.reduce((a, b) => (a > b ? a : b))
+  ]
+  if (gone || days.includes(t)) return null
+  const prior = days.filter((d) => d < t)
+  if (!prior.length) return null
+  const last = prior.reduce((a, b) => (a > b ? a : b))
   const gap = daysBetween(last, t)
   if (gap < 3) return null
   const overdue = tasks.filter((x) => openTask(x) && x.due_date && x.due_date < t).length

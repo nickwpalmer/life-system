@@ -45,7 +45,9 @@ export function fmtValue(m: Metric, v: number | null | undefined) {
   if (m.kind === 'boolean') return v ? 'Done' : '–'
   if (m.unit === '$') return `$${r % 1 ? r.toFixed(2) : r}`
   if (m.kind === 'duration' && m.unit === 'min' && r >= 60) return `${Math.floor(r / 60)}h ${Math.round(r % 60)}m`
-  return m.unit ? `${r} ${m.unit}` : String(r)
+  if (!m.unit) return String(r)
+  const plural = r !== 1 && /^(drink|glass|cup|serving|page|rep|session)$/.test(m.unit) ? (m.unit.endsWith('s') ? m.unit + 'es' : m.unit + 's') : m.unit
+  return `${r} ${plural}`
 }
 
 /** One-tap metrics log a fixed value; the rest open the log sheet. */
@@ -72,7 +74,7 @@ export const dayValue = (m: Metric, logs: Log[], day: string) => dailySeries(m, 
 export function consistency(series: (number | null)[]) {
   const hit = series.filter((v) => v != null && v > 0).length
   const n = series.length
-  const lastTwoMissed = n >= 2 && !(series[n - 1]! > 0) && !(series[n - 2]! > 0)
+  const lastTwoMissed = n >= 2 && hit > 0 && !(series[n - 1]! > 0) && !(series[n - 2]! > 0)
   return { hit, n, pct: n ? hit / n : 0, lastTwoMissed }
 }
 
