@@ -7,6 +7,7 @@ import { Card } from '../ui/kit'
 import { TaskRow, TaskSheet, AddTask, openTask } from './Tasks'
 import { useState } from 'preact/hooks'
 import type { Task } from '../lib/types'
+import { useKeyDates } from './School'
 
 function CheckinPrompt() {
   const checkins = useStore((s) => s.checkins)
@@ -122,6 +123,10 @@ function ComingUp() {
   for (const t of tasks) if (openTask(t) && t.due_date && daysUntil(t.due_date) > 0 && daysUntil(t.due_date) <= 14 && t.priority >= 2) items.push({ d: t.due_date, title: t.title, c: areas.find((a) => a.id === t.area_id)?.color ?? 'var(--violet)', href: '#/tasks' })
   for (const p of people) { const b = nextBirthday(p); if (b && daysUntil(b) <= 30) items.push({ d: b, title: `${p.name}’s birthday`, c: 'var(--pink)', href: '#/people' }) }
   for (const g of goals) if (g.status === 'active' && !g.suggested && g.target_date && daysUntil(g.target_date) >= 0 && daysUntil(g.target_date) <= 45) items.push({ d: g.target_date, title: g.title, c: 'var(--gold)', href: '#/goals' })
+  // Syllabus dates (exams up to three weeks out, other deadlines two weeks).
+  const [kd] = useKeyDates()
+  const edu = areas.find((a) => a.key === 'education')?.color ?? 'var(--lilac)'
+  for (const k of kd ?? []) if (!k.done && k.kind !== 'term' && daysUntil(k.day) > 0 && daysUntil(k.day) <= (k.kind === 'exam' ? 21 : 14)) items.push({ d: k.day, title: k.course ? `${k.course}: ${k.title}` : k.title, c: k.kind === 'exam' ? 'var(--pink)' : edu, href: '#/area/education' })
   items.sort((a, b) => a.d.localeCompare(b.d))
   if (!items.length) return null
   return (

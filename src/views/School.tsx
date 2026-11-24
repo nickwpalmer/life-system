@@ -15,7 +15,7 @@ const demoDates = (): KeyDate[] => [
   { id: 'k3', day: inDays(20), title: 'Last day of classes', course: null, kind: 'term', done: false },
 ]
 
-function useKeyDates() {
+export function useKeyDates() {
   const [rows, setRows] = useState<KeyDate[] | null>(null)
   useEffect(() => {
     if (getState().demo) { setRows(demoDates()); return }
