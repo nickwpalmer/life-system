@@ -69,6 +69,7 @@ Areas (`areas.key`): `education`, `mental`, `finances`, `health`, `work`, `relat
 - **Whole-day value:** one row per metric per day, `source='daily'`, `occurred_at` = **local noon** of that day (12:00 America/Detroit). If a daily row already exists for that metric and day, update it; don't add a second one.
 - **Timed value** (a mood right now, a workout at 6 PM): `source='app'` or `'claude'`, `occurred_at` = the actual time.
 - Apple Health writes `source='health'` through RPC `ingest_health`. Don't write those by hand.
+- The Ultrahuman ring writes `source='ring'` through `ingest_ring` (see Ring data). For the same metric and day, the ring's row replaces the Apple Health one, and Apple Health skips days the ring already filled. Don't write either by hand.
 - `value_num` for numbers, `value_text` for text metrics, `note` for context.
 
 ## Substances
@@ -97,6 +98,13 @@ Each asset has one page in the app (Records, top of the page) that pulls togethe
 - **To-dos** go in `tasks` with the asset's tag in `tags` (e.g. `tags = '{car}'`) and the `home` area. Titles can still start "Car:".
 - **Maintenance and repairs done** go in `asset_logs`: `asset_id`, `done_on`, `what` (e.g. "Oil change"), `miles` (vehicles), `cost` ($), `where_done`, `notes`. One row per job.
 - **Things in the apartment** go in `inventory_items` with `list` = the asset's `inventory_list` (`Apartment`).
+
+## Ring data (Ultrahuman)
+
+- A GitHub Action in the owner's private `life-system-backups` repo (`ring/pull.mjs`, `.github/workflows/ring.yml`) pulls each day from Ultrahuman's API with a personal token (secret `ULTRAHUMAN_TOKEN`; plain `Authorization` header, no Partner ID) and calls `public.ingest_ring(day, vals, raw)` over the database URL. It does nothing while the secret is missing.
+- `ring_days`: one row per day. `vals` holds normalized numbers (`sleep_hours`, `sleep_score`, `hrv`, `resting_hr`, `steps`, `deep_h`, `rem_h`, `light_h`, `sleep_efficiency`, `recovery_index`, `movement_index`, `vo2_max`, `temp_deviation`, `spo2`, `active_minutes`); `raw` keeps Ultrahuman's answer. Display-only: shown in Body & health. Don't edit these rows.
+- The five overlapping numbers also go into `logs` (`external_id` `ring:<metric>:<day>`).
+- The response shape wasn't confirmed when this was built. After the first real pull, read one `raw` row and fix the field names in `pull.mjs` if a number is missing or wrong. Never print or store the token anywhere else.
 
 ## Grades and checklists
 

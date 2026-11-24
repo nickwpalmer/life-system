@@ -6,7 +6,7 @@ import { getState, toast } from './store'
  * Tables that aren't in the one-shot bootstrap load on the screens that need them.
  * One shared cache per table, so every screen sees the same rows and writes update everywhere at once.
  */
-export type RowTable = 'substance_logs' | 'courses' | 'degree_reqs' | 'scholarships' | 'change_log' | 'key_dates' | 'edu_schools' | 'edu_courses' | 'records' | 'claude_inbox' | 'grade_logs' | 'reports' | 'inventory_items' | 'grade_items' | 'assets' | 'asset_logs'
+export type RowTable = 'substance_logs' | 'courses' | 'degree_reqs' | 'scholarships' | 'change_log' | 'key_dates' | 'edu_schools' | 'edu_courses' | 'records' | 'claude_inbox' | 'grade_logs' | 'reports' | 'inventory_items' | 'grade_items' | 'assets' | 'asset_logs' | 'ring_days'
 type Row = { id: string | number } & Record<string, unknown>
 const cache = new Map<RowTable, Row[]>()
 const loading = new Map<RowTable, Promise<void>>()
@@ -17,7 +17,7 @@ const ORDER: Record<RowTable, [string, boolean]> = {
   scholarships: ['deadline', true], change_log: ['at', false], key_dates: ['day', true],
   edu_schools: ['sort', true], edu_courses: ['term_order', true], records: ['name', true],
   claude_inbox: ['created_at', false], grade_logs: ['logged_at', true], reports: ['created_at', false], inventory_items: ['name', true], grade_items: ['sort', true],
-  assets: ['sort', true], asset_logs: ['done_on', false],
+  assets: ['sort', true], asset_logs: ['done_on', false], ring_days: ['day', false],
 }
 
 export function registerDemo(t: RowTable, f: () => Row[]) { demoRows.set(t, f) }
@@ -31,10 +31,11 @@ export function loadRows(t: RowTable, force = false) {
   const p = (async () => {
     if (getState().demo) { set(t, demoRows.get(t)?.() ?? []); return }
     const [col, asc] = ORDER[t]
-    let q = supabase.from(t).select('*').order(col, { ascending: asc, nullsFirst: false })
+    let q = supabase.from(t).select((t === 'ring_days' ? 'id,day,vals,fetched_at' : '*') as '*').order(col, { ascending: asc, nullsFirst: false })
     if (t === 'change_log') q = q.limit(200)
     if (t === 'claude_inbox') q = q.limit(100)
     if (t === 'substance_logs') q = q.limit(2000)
+    if (t === 'ring_days') q = q.limit(120) // raw API answers stay in the database
     const { data, error } = await q
     if (error) { toast(`Couldn’t load: ${error.message}`); set(t, []); return }
     set(t, (data ?? []) as Row[])

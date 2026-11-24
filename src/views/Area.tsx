@@ -9,6 +9,7 @@ import { TaskRow, TaskSheet, AddTask, openTask } from './Tasks'
 import { goalProgress } from './Goals'
 import { MoneyPanel } from './Money'
 import { SchoolPanel } from './School'
+import { RingPanel } from './Ring'
 
 const avg = (xs: (number | null)[]) => { const v = xs.filter((x): x is number => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null }
 const sum = (xs: (number | null)[]) => xs.reduce<number>((a, b) => a + (b ?? 0), 0)
@@ -134,6 +135,7 @@ export function AreaView({ areaKey }: { areaKey: string }) {
       {a.key === 'finances' && <Finances />}
       {a.key === 'mental' && <Mental />}
       {a.key === 'education' && <SchoolPanel />}
+      {a.key === 'health' && <RingPanel />}
       <div class="grid-2">
         <div>
           {a.key === 'education' && <Education tasks={open} onOpen={setEdit} />}

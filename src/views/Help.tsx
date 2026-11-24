@@ -33,6 +33,16 @@ export function Help({ section }: { section?: string }) {
         ))}
       </section>
       <div id="health"><HealthSync /></div>
+      <section class="card" style="--accent:var(--mint)">
+        <div class="card-h"><h2>Ultrahuman ring, direct</h2></div>
+        <p class="muted small" style="margin-bottom:10px">More than Apple Health passes along: recovery, sleep stages, VO2 max and skin temperature, pulled straight from Ultrahuman every morning and evening. No phone needed. It’s built and waiting for a token.</p>
+        <ol class="steps small">
+          <li>Make a token: sign in at <b>vision.ultrahuman.com</b> with your app email, then <b>Developer › Personal API Tokens</b>. Copy it. Treat it like a password.</li>
+          <li>On GitHub, open your private <b>life-system-backups</b> repo, then <b>Settings › Secrets and variables › Actions › New repository secret</b>. Name it <code>ULTRAHUMAN_TOKEN</code>, paste the token as the value, and tap <b>Add secret</b>.</li>
+          <li>Tell Claude it’s in. Claude runs a test pull, checks the numbers and fills in past days.</li>
+        </ol>
+        <p class="faint tiny">When the ring and Apple Health both have a day, the ring’s number is the one kept. The Shortcut can stay on as a backup.</p>
+      </section>
       <p class="faint small" style="text-align:center">Anything else, just ask Claude.</p>
     </>
   )
