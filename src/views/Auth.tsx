@@ -12,11 +12,12 @@ export function AuthScreen() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [busy, setBusy] = useState(false)
+  const [fidBusy, setFidBusy] = useState(false)
   const [err, setErr] = useState('')
   const [ok, setOk] = useState('')
 
   async function faceId() {
-    setErr(''); setBusy(true)
+    setErr(''); setFidBusy(true)
     try { await unlockWithPasskey() }
     catch (e) {
       const m = (e as Error).message || ''
@@ -24,7 +25,7 @@ export function AuthScreen() {
         : /not.?found|not registered/i.test(m) ? 'No Face ID passkey for this app yet. Sign in with your password, then add one in Settings.'
         : /abort|cancel|NotAllowed/i.test(m) ? '' : m)
     }
-    setBusy(false)
+    setFidBusy(false)
   }
 
   async function submit(e: Event) {
@@ -58,8 +59,8 @@ export function AuthScreen() {
 
         {passkeySupported() && (
           <>
-            <button class="faceid" onClick={faceId} disabled={busy} aria-label="Unlock with Face ID"><Icon name="face" size={44} stroke={1.5} /></button>
-            <button class="btn ghost" onClick={faceId} disabled={busy}>Unlock with Face ID</button>
+            <button class="faceid" onClick={faceId} disabled={fidBusy} aria-label={locked ? 'Unlock with Face ID' : 'Sign in with Face ID'}><Icon name="face" size={44} stroke={1.5} /></button>
+            <button class="btn ghost" onClick={faceId} disabled={fidBusy}>{locked ? 'Unlock with Face ID' : 'Sign in with Face ID'}</button>
           </>
         )}
 
