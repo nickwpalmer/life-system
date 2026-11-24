@@ -211,16 +211,16 @@ function Work({ all }: { all: CalEvent[] }) {
 
 /** Pay estimate from shift hours. Rate and tips are set here or in Settings; actual pay comes from stubs later. */
 function PayCard({ p, week, next, month, perHour, drive }: { p: Prefs; week: number; next: number; month: number; perHour: number; drive: number }) {
-  const [edit, setEdit] = useState(false)
+  const [edit, setEdit] = useState(!perHour)
   const num = (v: string) => v === '' ? null : Number(v)
-  if (!perHour || edit) return (
+  if (edit || !perHour) return (
     <Card title="Pay estimate" icon="money" accent="var(--gold)">
       <p class="faint small" style="margin:-4px 0 10px">Add your rate and roughly what tips come to per hour, and shifts turn into an estimate. You can fine-tune it from pay stubs later.</p>
       <div class="row">
         <label class="field grow"><span>Hourly rate ($)</span><input class="input" type="number" inputMode="decimal" value={p.pay.rate ?? ''} onChange={(e) => savePrefs({ pay: { ...p.pay, rate: num((e.target as HTMLInputElement).value) } })} /></label>
         <label class="field grow"><span>Tips per hour ($)</span><input class="input" type="number" inputMode="decimal" value={p.pay.tips ?? ''} onChange={(e) => savePrefs({ pay: { ...p.pay, tips: num((e.target as HTMLInputElement).value) } })} /></label>
       </div>
-      {perHour > 0 && <button class="btn sm ghost" onClick={() => setEdit(false)}>Done</button>}
+      {perHour > 0 && edit && <button class="btn sm primary" onClick={() => setEdit(false)}>Show estimate</button>}
     </Card>
   )
   return (

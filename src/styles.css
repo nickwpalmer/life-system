@@ -748,3 +748,5 @@ button.tile { text-align: left; font: inherit; cursor: pointer; }
 .tabbar-preview.pick .fixed { opacity: .5; }
 .tabbar-preview.pick button { border: 1px dashed var(--line); color: var(--text); }
 .tabbar-preview.pick button.on { border: 1.5px solid var(--violet); background: color-mix(in oklab, var(--violet) 16%, transparent); }
+/* A guided flow takes the whole screen: no bottom bar or capture button while it runs. */
+body:has(.flow) nav.nav, body:has(.flow) .fab { display: none; }
