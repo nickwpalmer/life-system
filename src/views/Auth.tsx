@@ -2,6 +2,9 @@ import { useState } from 'preact/hooks'
 import { supabase, lockEnabled } from '../lib/supabase'
 import { unlockWithPasskey, passkeySupported } from '../lib/lock'
 import { Icon } from '../ui/icons'
+import { logoUrl, type LogoKey } from '../lib/prefs'
+
+const savedLogo = (): LogoKey => { try { return (localStorage.getItem('life-logo') as LogoKey) || 'classic' } catch { return 'classic' } }
 
 const APP_URL = `${location.origin}/life-system/`
 
@@ -51,11 +54,11 @@ export function AuthScreen() {
   }
 
   return (
-    <div class="center">
+    <div class="center lockscreen">
+      <div class="morph" aria-hidden="true"><i /><i /><i /></div>
       <div class="auth">
-        <img class="logo" src={`${import.meta.env.BASE_URL}icon-192.png`} alt="" />
-        <h1>{locked ? 'Welcome back' : <span class="grad-text">Life</span>}</h1>
-        <p class="muted">{locked ? 'Locked to keep your things private.' : 'Your private place for days, goals and growth.'}</p>
+        <img class="logo still" src={logoUrl(savedLogo())} alt="" />
+        <h1>{locked ? 'Welcome back' : 'Life'}</h1>
 
         {passkeySupported() && (
           <>

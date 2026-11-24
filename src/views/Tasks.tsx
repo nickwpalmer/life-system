@@ -124,13 +124,97 @@ export function AddTask({ defaults, placeholder = 'Add a task… try “essay fr
   )
 }
 
-type View = 'inbox' | 'today' | 'upcoming' | 'areas' | 'someday' | 'done'
+type View = 'home' | 'inbox' | 'today' | 'upcoming' | 'someday' | 'done'
 
-export function Tasks({ initial }: { initial?: View }) {
+/** Which class a task belongs to, from a tag like MAT-2010 or the course code in its title. */
+export function courseOf(t: Task): string | null {
+  for (const g of t.tags ?? []) { const m = g.match(/^([A-Z]{2,4})[- ]?(\d{4})$/i); if (m) return `${m[1].toUpperCase()} ${m[2]}` }
+  const m = t.title.match(/\b([A-Z]{2,4})[ -]?(\d{4})\b/)
+  return m ? `${m[1]} ${m[2]}` : null
+}
+export const KINDS = [
+  { key: 'exam', label: 'Exam prep', test: /\b(exam|test|quiz|final|midterm|study)\b/i },
+  { key: 'hw', label: 'Homework', test: /\b(hw|homework|problem set|pset|assignment|worksheet|essay|report|paper|project)\b/i },
+  { key: 'class', label: 'Class activities', test: /\b(lab|activity|class|lecture|reading|read|chapter|discussion|lesson|seminar)\b/i },
+] as const
+export const kindOf = (t: Task) => KINDS.find((k) => k.test.test(t.title))?.key ?? 'other'
+
+/** One area's tasks. School work is split by class, then homework, exam prep and class activities. */
+function AreaTasks({ areaKey }: { areaKey: string }) {
+  const tasks = useStore((s) => s.tasks)
+  const area = useStore((s) => s.areas.find((a) => a.key === areaKey))
+  const [edit, setEdit] = useState<Task | null>(null)
+  const t0 = today()
+  const mine = tasks.filter((t) => openTask(t) && t.status !== 'inbox' && (areaKey === 'none' ? !t.area_id : t.area_id === area?.id))
+  const byDue = (a: Task, b: Task) => (a.due_date ?? '9999').localeCompare(b.due_date ?? '9999') || b.priority - a.priority
+  const row = (t: Task) => <TaskRow t={t} onOpen={setEdit} />
+  const doneWeek = tasks.filter((t) => t.status === 'done' && (areaKey === 'none' ? !t.area_id : t.area_id === area?.id) && t.completed_at && dayKey(new Date(t.completed_at)) >= dayKey(addDays(new Date(), -7))).length
+  let body
+  if (areaKey === 'education') {
+    const courses = new Map<string, Task[]>()
+    for (const t of mine.sort(byDue)) { const c = courseOf(t) ?? 'Other school'; courses.set(c, [...(courses.get(c) ?? []), t]) }
+    body = [...courses].map(([c, ts]) => (
+      <section class="card" style={`--accent:${area?.color}`}>
+        <div class="card-h"><h2>{c}</h2><span class="faint small">{ts.length} open{ts.some((x) => x.due_date && x.due_date < t0) ? ` · ${ts.filter((x) => x.due_date && x.due_date < t0).length} late` : ''}</span></div>
+        {[...KINDS, { key: 'other', label: 'Other' }].map((k) => { const g = ts.filter((x) => kindOf(x) === k.key); return g.length ? <><div class="group-h"><span>{k.label}</span><span>{g.length}</span></div>{g.map(row)}</> : null })}
+      </section>
+    ))
+  } else {
+    const late = mine.filter((t) => t.due_date && t.due_date < t0).sort(byDue)
+    const now = mine.filter((t) => t.due_date === t0 || t.scheduled_for === t0 || t.status === 'doing')
+    const later = mine.filter((t) => t.due_date && t.due_date > t0 && !now.includes(t)).sort(byDue)
+    const any = mine.filter((t) => !t.due_date && !now.includes(t)).sort((a, b) => b.priority - a.priority)
+    body = <section class="card" style={`--accent:${area?.color ?? 'var(--violet)'}`}>
+      {([['Overdue', late], ['Today', now], ['Coming up', later], ['Anytime', any]] as const).map(([l, g]) => g.length ? <><div class="group-h"><span>{l}</span><span>{g.length}</span></div>{g.map(row)}</> : null)}
+      {!mine.length && <p class="empty">Nothing open here.</p>}
+    </section>
+  }
+  return (
+    <>
+      <PageHead title={area?.name ?? 'No area'} sub={`${mine.length} open · ${doneWeek} done this week`} back="#/tasks" icon="tasks" color={area?.color ?? 'var(--violet)'} />
+      <AddTask defaults={{ area_id: area?.id ?? null, status: 'open' }} placeholder={`Add to ${area?.name ?? 'tasks'}…`} />
+      {body}
+      <TaskSheet task={edit} onClose={() => setEdit(null)} />
+    </>
+  )
+}
+
+/** The Tasks front page: capture at the top, then one tile per area with what's due and late. */
+function Overview({ go }: { go: (v: View) => void }) {
   const tasks = useStore((s) => s.tasks)
   const areas = useStore((s) => s.areas)
+  const t0 = today()
+  const live = tasks.filter((t) => openTask(t) && t.status !== 'inbox')
+  const inbox = tasks.filter((t) => t.status === 'inbox').length
+  const cards = [...areas.filter((a) => !a.archived), { id: null, key: 'none', name: 'No area', color: 'var(--faint)' }].map((a) => {
+    const mine = live.filter((t) => (t.area_id ?? null) === a.id)
+    return { a, open: mine.length, late: mine.filter((t) => t.due_date && t.due_date < t0).length, today: mine.filter((t) => t.due_date === t0 || t.status === 'doing').length, week: mine.filter((t) => t.due_date && t.due_date > t0 && daysUntil(t.due_date) <= 7).length }
+  }).filter((c) => c.open)
+  return (
+    <>
+      {inbox > 0 && <button class="card prompt" style="--accent:var(--violet);width:100%" onClick={() => go('inbox')}><span class="orb cool"><Icon name="inbox" size={22} /></span><span class="grow" style="text-align:left"><h3>{inbox} to sort</h3><p class="muted small">Give each one a day or an area.</p></span><Icon name="chev" /></button>}
+      <div class="atiles">
+        {cards.map((c) => (
+          <a class="atile" href={`#/tasks/${c.a.key}`} style={`--c:${c.a.color}`}>
+            <div class="a-name">{c.a.name}</div>
+            <div class="a-n">{c.open}<span> open</span></div>
+            <div class="a-meta">{c.late > 0 && <span class="pill late">{c.late} late</span>}{c.today > 0 && <span class="pill">{c.today} today</span>}{c.week > 0 && <span class="pill quiet">{c.week} this week</span>}</div>
+          </a>
+        ))}
+      </div>
+    </>
+  )
+}
+
+export function Tasks({ initial, areaKey }: { initial?: View; areaKey?: string }) {
+  if (areaKey) return <AreaTasks areaKey={areaKey} />
+  return <TaskLists initial={initial} />
+}
+
+function TaskLists({ initial }: { initial?: View }) {
+  const tasks = useStore((s) => s.tasks)
   const inboxN = tasks.filter((t) => t.status === 'inbox').length
-  const [view, setView] = useState<View>(initial ?? (inboxN ? 'inbox' : 'today'))
+  const [view, setView] = useState<View>(initial ?? 'home')
   const [edit, setEdit] = useState<Task | null>(null)
   const t0 = today()
   const open = tasks.filter(openTask)
@@ -141,9 +225,10 @@ export function Tasks({ initial }: { initial?: View }) {
   const nodate = active.filter((t) => !t.due_date && t.status !== 'doing').sort((a, b) => b.priority - a.priority)
   const row = (t: Task) => <TaskRow t={t} onOpen={setEdit} process={view === 'inbox'} />
 
-  const tabs: [View, string, number?][] = [['inbox', 'Inbox', inboxN], ['today', 'Today', todayList.length], ['upcoming', 'Upcoming'], ['areas', 'By area'], ['someday', 'Someday'], ['done', 'Done']]
+  const tabs: [View, string, number?][] = [['home', 'Overview'], ['inbox', 'Inbox', inboxN], ['today', 'Today', todayList.length], ['upcoming', 'Upcoming'], ['someday', 'Someday'], ['done', 'Done']]
   let body
-  if (view === 'inbox') {
+  if (view === 'home') body = <Overview go={setView} />
+  else if (view === 'inbox') {
     const inbox = open.filter((t) => t.status === 'inbox').sort((a, b) => a.created_at.localeCompare(b.created_at))
     body = <section class="card">
       <p class="muted small" style="margin-bottom:6px">Give each one a home: a day, or no date. If it takes two minutes, just do it.</p>
@@ -158,11 +243,6 @@ export function Tasks({ initial }: { initial?: View }) {
     const groups = new Map<string, Task[]>()
     for (const t of upcoming) { const k = t.due_date!; groups.set(k, [...(groups.get(k) ?? []), t]) }
     body = <section class="card">{upcoming.length ? [...groups].map(([d, ts]) => <><div class="group-h"><span>{fmtDay(d)}</span><span>{daysUntil(d)}d</span></div>{ts.map(row)}</>) : <p class="empty">Nothing scheduled ahead.</p>}</section>
-  } else if (view === 'areas') {
-    body = <>{areas.filter((a) => !a.archived).map((a) => {
-      const ts = active.filter((t) => t.area_id === a.id).sort(byDue)
-      return ts.length ? <section class="card" style={`--accent:${a.color}`}><div class="card-h"><h2 style={`color:${a.color}`}>{a.name}</h2><a class="link" href={`#/area/${a.key}`}>Open</a></div>{ts.map(row)}</section> : null
-    })}{active.filter((t) => !t.area_id).length > 0 && <section class="card"><div class="card-h"><h2>No area</h2></div>{active.filter((t) => !t.area_id).map(row)}</section>}</>
   } else if (view === 'someday') {
     const s = open.filter((t) => t.tags?.includes('someday'))
     body = <section class="card"><p class="muted small" style="margin-bottom:6px">Ideas you’re not committing to yet. Look through them in your weekly review.</p>{s.length ? s.map(row) : <p class="empty">Nothing parked here.</p>}</section>

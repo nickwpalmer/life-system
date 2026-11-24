@@ -19,7 +19,9 @@ type State = Data & {
   locked: boolean
   demo: boolean
   toast: { id: number; text: string; undo?: () => void } | null
-  capture: boolean
+  /** Capture sheet: false, true, or the mode to open it in. */
+  capture: boolean | 'task' | 'journal' | 'note' | 'mood'
+  substance: boolean
 }
 
 export const emptyData = (): Data => ({
@@ -27,7 +29,7 @@ export const emptyData = (): Data => ({
   goals: [], people: [], reviews: [], events: [], synced_at: null,
 })
 
-let state: State = { ...emptyData(), session: null, ready: false, loaded: false, locked: false, demo: false, toast: null, capture: false }
+let state: State = { ...emptyData(), session: null, ready: false, loaded: false, locked: false, demo: false, toast: null, capture: false, substance: false }
 const subs = new Set<() => void>()
 let queued = false
 

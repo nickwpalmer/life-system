@@ -23,6 +23,11 @@ import { WeeklyReview } from './views/Review'
 import { AreaView } from './views/Area'
 import { People } from './views/People'
 import { Capture } from './views/Capture'
+import { Substances, GlobalSubstanceSheet } from './views/Substances'
+import { Education } from './views/Education'
+import { Changes } from './views/Changes'
+import { Help } from './views/Help'
+import { usePrefs, logoUrl, applyTheme, applyLogo } from './lib/prefs'
 
 function useRoute() {
   const get = () => location.hash.replace(/^#\/?/, '') || 'today'
@@ -37,25 +42,32 @@ function useRoute() {
 
 const isDemo = /[?&]demo\b/.test(location.search)
 
-// Everything you can go to. `tab` = shows in the phone tab bar.
-const NAV: { r: string; icon: string; label: string; c: string; tab?: boolean; group: 'main' | 'life' | 'system' }[] = [
-  { r: 'today', icon: 'home', label: 'Today', c: 'var(--orange)', tab: true, group: 'main' },
-  { r: 'tasks', icon: 'tasks', label: 'Tasks', c: 'var(--violet)', tab: true, group: 'main' },
-  { r: 'log', icon: 'sliders', label: 'Daily log', c: 'var(--pink)', tab: true, group: 'main' },
-  { r: 'calendar', icon: 'cal', label: 'Calendar', c: 'var(--sky)', group: 'main' },
-  { r: 'journal', icon: 'book', label: 'Journal', c: 'var(--mint)', tab: true, group: 'main' },
-  { r: 'goals', icon: 'target', label: 'Goals', c: 'var(--gold)', group: 'life' },
-  { r: 'review', icon: 'review', label: 'Weekly review', c: 'var(--lilac)', group: 'life' },
-  { r: 'insights', icon: 'chart', label: 'Insights', c: 'var(--teal)', group: 'life' },
-  { r: 'people', icon: 'users', label: 'People', c: 'var(--coral)', group: 'life' },
-  { r: 'notes', icon: 'note', label: 'Reference', c: 'var(--peach)', group: 'life' },
-  { r: 'settings', icon: 'gear', label: 'Settings', c: 'var(--muted)', group: 'system' },
+// Everything you can go to. The bottom bar shows Home, three of these (you pick in Settings), and Everything.
+export type NavItem = { r: string; icon: string; label: string; c: string; group: 'main' | 'life' | 'system'; sub?: string }
+export const NAV: NavItem[] = [
+  { r: 'today', icon: 'home', label: 'Home', c: 'var(--orange)', group: 'main' },
+  { r: 'tasks', icon: 'tasks', label: 'Tasks', c: 'var(--violet)', group: 'main', sub: 'Capture, sort, do' },
+  { r: 'calendar', icon: 'cal', label: 'Calendar', c: 'var(--sky)', group: 'main', sub: 'Month, week, free time' },
+  { r: 'log', icon: 'sliders', label: 'Daily log', c: 'var(--pink)', group: 'main', sub: 'Today’s numbers' },
+  { r: 'journal', icon: 'book', label: 'Journal', c: 'var(--mint)', group: 'main', sub: 'Write it down' },
+  { r: 'school', icon: 'school', label: 'Education', c: 'var(--lilac)', group: 'life', sub: 'Classes, degree, history' },
+  { r: 'money', icon: 'money', label: 'Finances', c: 'var(--gold)', group: 'life', sub: 'Accounts, bills, spending' },
+  { r: 'health', icon: 'heart', label: 'Health', c: 'var(--mint)', group: 'life', sub: 'Sleep, body, mind' },
+  { r: 'substances', icon: 'flask', label: 'Substances', c: 'var(--orange)', group: 'life', sub: 'Everything non-food' },
+  { r: 'goals', icon: 'target', label: 'Goals', c: 'var(--gold)', group: 'life', sub: 'What you’re building' },
+  { r: 'review', icon: 'review', label: 'Weekly review', c: 'var(--lilac)', group: 'life', sub: 'Last week, next week' },
+  { r: 'insights', icon: 'chart', label: 'Insights', c: 'var(--teal)', group: 'life', sub: 'Patterns and reviews' },
+  { r: 'people', icon: 'users', label: 'People', c: 'var(--coral)', group: 'life', sub: 'Birthdays, keeping in touch' },
+  { r: 'notes', icon: 'note', label: 'Reference', c: 'var(--peach)', group: 'life', sub: 'Notes to keep' },
+  { r: 'changes', icon: 'undo', label: 'Claude’s changes', c: 'var(--violet)', group: 'system', sub: 'See and undo edits' },
+  { r: 'settings', icon: 'gear', label: 'Settings', c: 'var(--muted)', group: 'system', sub: 'Preferences and connections' },
+  { r: 'help', icon: 'help', label: 'Help', c: 'var(--sky)', group: 'system', sub: 'How things work' },
 ]
+export const navItem = (r: string) => NAV.find((n) => n.r === r)
 
 function Sidebar({ base }: { base: string }) {
   const inbox = useStore((s) => s.tasks.filter((t) => t.status === 'inbox').length)
-  const areas = useStore((s) => s.areas)
-  const a = (n: typeof NAV[number]) => (
+  const a = (n: NavItem) => (
     <a class={`s-item ${base === n.r ? 'on' : ''}`} href={`#/${n.r}`} style={`--c:${n.c}`}>
       <span class="s-ico"><Icon name={n.icon} size={19} /></span>{n.label}
       {n.r === 'tasks' && inbox > 0 && <span class="badge">{inbox}</span>}
@@ -63,17 +75,11 @@ function Sidebar({ base }: { base: string }) {
   )
   return (
     <aside class="side" aria-label="Main">
-      <a class="brand" href="#/today"><img src={`${import.meta.env.BASE_URL}icon-192.png`} alt="" />Life</a>
+      <a class="brand" href="#/today"><img src={logoUrl(usePrefs().logo)} alt="" />Life</a>
       <button class="btn primary new" onClick={() => setState({ capture: true })}><Icon name="plus" size={18} /> Capture <span class="tiny" style="opacity:.6">N</span></button>
       {NAV.filter((n) => n.group === 'main').map(a)}
       <div class="s-label">Life</div>
       {NAV.filter((n) => n.group === 'life').map(a)}
-      <div class="s-label">Areas</div>
-      {areas.filter((x) => !x.archived && ['education', 'mental', 'finances'].includes(x.key)).map((x) => (
-        <a class={`s-item ${base === 'area' && location.hash.endsWith(x.key) ? 'on' : ''}`} href={`#/area/${x.key}`} style={`--c:${x.color}`}>
-          <span class="s-ico"><i class="dot" style={`background:${x.color};width:10px;height:10px;margin:0 4px`} /></span>{x.name}
-        </a>
-      ))}
       <div style="height:10px" />
       {NAV.filter((n) => n.group === 'system').map(a)}
       <div class="s-foot">Press N to capture · 1–7 to switch</div>
@@ -83,7 +89,8 @@ function Sidebar({ base }: { base: string }) {
 
 function TabBar({ base }: { base: string }) {
   const inbox = useStore((s) => s.tasks.some((t) => t.status === 'inbox'))
-  const tabs = NAV.filter((n) => n.tab)
+  const prefs = usePrefs()
+  const tabs = [navItem('today')!, ...prefs.tabs.map(navItem).filter((n): n is NavItem => !!n)]
   const onTab = tabs.some((t) => t.r === base)
   return (
     <nav class="nav" aria-label="Main">
@@ -92,7 +99,7 @@ function TabBar({ base }: { base: string }) {
           <Icon name={n.icon} />{n.r === 'tasks' && inbox && <i class="nb" />}
         </a>
       ))}
-      <a href="#/more" class={!onTab ? 'on' : ''} style="--c:var(--lilac)" aria-label="More"><Icon name="grid" /></a>
+      <a href="#/more" class={!onTab ? 'on' : ''} style="--c:var(--lilac)" aria-label="Everything"><Icon name="grid" /></a>
     </nav>
   )
 }
@@ -104,7 +111,7 @@ function useShortcuts() {
       if (e.metaKey || e.ctrlKey || e.altKey || /INPUT|TEXTAREA|SELECT/.test(t.tagName) || t.isContentEditable) return
       if (document.querySelector('.sheet')) return
       if (e.key === 'n' || e.key === 'c') { e.preventDefault(); setState({ capture: true }) }
-      const map: Record<string, string> = { '1': 'today', '2': 'tasks', '3': 'log', '4': 'calendar', '5': 'journal', '6': 'goals', '7': 'review' }
+      const map: Record<string, string> = { '1': 'today', '2': 'tasks', '3': 'calendar', '4': 'school', '5': 'log', '6': 'journal', '7': 'money' }
       if (map[e.key]) location.hash = `#/${map[e.key]}`
     }
     addEventListener('keydown', f)
@@ -118,6 +125,13 @@ export function App() {
   const loaded = useStore((s) => s.loaded)
   const route = useRoute()
   useShortcuts()
+  const { theme, logo } = usePrefs()
+  // Prefs live on your profile, so a change on the phone shows up on the Mac too.
+  useEffect(() => {
+    if (!loaded) return
+    applyTheme(theme); applyLogo(logo)
+    try { localStorage.setItem('life-theme', theme); localStorage.setItem('life-logo', logo) } catch { /* private mode */ }
+  }, [theme, logo, loaded])
 
   useEffect(() => {
     if (isDemo) {
@@ -151,7 +165,13 @@ export function App() {
   let view
   if (!loaded) view = <><div class="skeleton" style="width:40%;height:30px" /><div class="skeleton" /><div class="skeleton" style="width:70%" /></>
   else switch (base) {
-    case 'tasks': view = <Tasks />; break
+    case 'tasks': view = <Tasks areaKey={sub} />; break
+    case 'school': view = <Education tab={sub} />; break
+    case 'money': view = <AreaView areaKey="finances" />; break
+    case 'health': view = <AreaView areaKey="health" />; break
+    case 'substances': view = <Substances />; break
+    case 'changes': view = <Changes />; break
+    case 'help': view = <Help />; break
     case 'inbox': view = <Tasks initial="inbox" />; break
     case 'log': view = <DailyLog day={sub || today()} />; break
     case 'journal': view = <Journal />; break
@@ -179,6 +199,7 @@ export function App() {
       {base !== 'checkin' && <button class="fab" aria-label="Capture" onClick={() => setState({ capture: true })}><Icon name="plus" size={26} stroke={2.4} /></button>}
       <TabBar base={base} />
       <Capture />
+      <GlobalSubstanceSheet />
       <Toast />
     </>
   )

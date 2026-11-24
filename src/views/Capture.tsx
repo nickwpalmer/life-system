@@ -5,8 +5,9 @@ import { parseQuick } from '../lib/parse'
 import { fmtDay, fmtClock } from '../lib/dates'
 import { Sheet, haptic } from '../ui/kit'
 import { Icon } from '../ui/icons'
+import { MoodTap } from './Today'
 
-type Mode = 'task' | 'journal' | 'note'
+type Mode = 'task' | 'journal' | 'note' | 'mood'
 
 /**
  * One place to get anything out of your head (GTD "capture").
@@ -18,7 +19,7 @@ export function Capture() {
   const [text, setText] = useState('')
   const [mode, setMode] = useState<Mode>('task')
   const ref = useRef<HTMLTextAreaElement>(null)
-  useEffect(() => { if (open) { setText(''); setMode('task'); setTimeout(() => ref.current?.focus(), 60) } }, [open])
+  useEffect(() => { if (open) { setText(''); setMode(typeof open === 'string' ? open : 'task'); setTimeout(() => ref.current?.focus(), 60) } }, [open])
   const close = () => setState({ capture: false })
   const p = parseQuick(text, areas)
   const filed = !!(p.due_date || p.area_id)
@@ -51,12 +52,14 @@ export function Capture() {
 
   const area = areas.find((a) => a.id === p.area_id)
   return (
-    <Sheet open={open} onClose={close} title="Capture">
+    <Sheet open={!!open} onClose={close} title="Capture">
       <div class="chips" style="margin-bottom:12px">
-        {([['task', 'Task', 'tasks', 'var(--violet)'], ['journal', 'Journal', 'book', 'var(--mint)'], ['note', 'Reference', 'note', 'var(--peach)']] as const).map(([m, l, ic, c]) => (
+        {([['task', 'Task', 'tasks', 'var(--violet)'], ['mood', 'Mood', 'heart', 'var(--pink)'], ['journal', 'Journal', 'book', 'var(--mint)'], ['note', 'Reference', 'note', 'var(--peach)']] as const).map(([m, l, ic, c]) => (
           <button class={`chip ${mode === m ? 'on' : ''}`} style={`--c:${c}`} onClick={() => setMode(m)}><Icon name={ic} size={16} />{l}</button>
         ))}
+        <button class="chip" style="--c:var(--orange)" onClick={() => setState({ capture: false, substance: true })}><Icon name="flask" size={16} />Substance</button>
       </div>
+      {mode === 'mood' ? <><p class="muted small" style="margin:0 2px 12px">How are you right now? Saved with the time.</p><MoodTap onDone={close} /></> : <>
       <textarea ref={ref} class="input" rows={mode === 'task' ? 2 : 5} style="min-height:0"
         placeholder={mode === 'task' ? 'What’s on your mind? Try “call dentist tomorrow 3pm #health”' : mode === 'journal' ? 'Write freely…' : 'Title on the first line, details below'}
         value={text} onInput={(e) => setText((e.target as HTMLTextAreaElement).value)}
@@ -70,7 +73,7 @@ export function Capture() {
       <div class="row" style="margin-top:12px">
         <button class="btn primary grow" disabled={!text.trim()} onClick={() => save()}>Save</button>
         <button class="btn" disabled={!text.trim()} onClick={() => save(true)} title="Save and add another">+ Another</button>
-      </div>
+      </div></>}
     </Sheet>
   )
 }

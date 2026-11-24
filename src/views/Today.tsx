@@ -1,114 +1,179 @@
-import { useStore, setState } from '../lib/store'
-import { today, fmtLongDate, partOfDay, checkinKindNow, checkinDay, fmtTime, daysUntil, daysBetween, fmtDay, weekStart, dayKey, inDays, lastNDays } from '../lib/dates'
-import { dailySeries, fmtValue, consistency, LOG_GROUPS, groupOf } from '../lib/metrics'
-import { eventsOn, calColor, nextBirthday } from '../lib/cal'
-import { Icon } from '../ui/icons'
-import { Card } from '../ui/kit'
-import { TaskRow, TaskSheet, AddTask, openTask } from './Tasks'
 import { useState } from 'preact/hooks'
-import type { Task } from '../lib/types'
+import { useStore, setState, metricByKey, toast } from '../lib/store'
+import { today, fmtLongDate, partOfDay, fmtTime, daysUntil, daysBetween, fmtDay, weekStart, dayKey, relTime, fromKey } from '../lib/dates'
+import { eventDay, calColor, nextBirthday } from '../lib/cal'
+import { addTimedLog } from '../lib/db'
+import { usePrefs, phaseNow } from '../lib/prefs'
+import { Icon } from '../ui/icons'
+import { Card, haptic } from '../ui/kit'
+import { openTask } from './Tasks'
 import { useKeyDates } from './School'
+import { SubstanceQuick } from './Substances'
 
-function CheckinPrompt() {
-  const checkins = useStore((s) => s.checkins)
-  const kind = checkinKindNow()
-  const t = today()
-  if (!kind) {
-    const m = checkins.find((c) => c.kind === 'morning' && c.day === t)
-    return m?.intention ? <div class="card soft"><div class="faint small">Today’s intention</div><div style="font-size:17px;margin-top:4px">{m.intention}</div></div> : null
+/** Mood right now: five taps, saved as a timed mood entry (1 to 10 scale). */
+export const MOODS: [number, string, string][] = [[2, 'Rough', '#8fc4ff'], [4, 'Low', '#a98bff'], [6, 'Okay', '#cdb9ff'], [8, 'Good', '#ffc08a'], [10, 'Great', '#ffa463']]
+
+export function MoodTap({ onDone }: { onDone?: () => void }) {
+  const [picked, setPicked] = useState<number | null>(null)
+  const log = async (v: number) => {
+    const m = metricByKey('mood')
+    if (!m) { toast('Add a Mood tracker in Settings first'); return }
+    haptic(); setPicked(v)
+    try { await addTimedLog(m.id, v, null, null, new Date().toISOString()); toast(`Mood logged at ${fmtTime(new Date().toISOString())}`); onDone?.() } catch { setPicked(null) }
   }
-  const day = checkinDay(kind)
-  const done = checkins.find((c) => c.kind === kind && c.day === day)
-  if (done) {
-    const m = checkins.find((c) => c.kind === 'morning' && c.day === t)
-    return m?.intention && kind === 'morning' ? <div class="card soft"><div class="faint small">Today’s intention</div><div style="font-size:17px;margin-top:4px">{m.intention}</div></div> : null
-  }
-  const morning = kind === 'morning'
   return (
-    <a class="card soft prompt" href={`#/checkin/${kind}`}>
-      <span class={`orb ${morning ? '' : 'cool'}`}><Icon name={morning ? 'sun' : 'moon'} size={24} /></span>
-      <span class="grow"><h3>{morning ? 'Morning check-in' : 'Night check-in'}</h3><p class="muted small">{morning ? 'Sleep, mood and your top three. About a minute.' : 'Log the day, a win, and wind down.'}</p></span>
-      <Icon name="chev" />
-    </a>
-  )
-}
-
-const seenKey = 'wb-dismissed'
-function readSeen() { try { return localStorage.getItem(seenKey) } catch { return null } }
-
-/** After a few quiet days: no streak shaming, just a clean restart. */
-function WelcomeBack() {
-  const logs = useStore((s) => s.logs)
-  const checkins = useStore((s) => s.checkins)
-  const tasks = useStore((s) => s.tasks)
-  const [gone, setGone] = useState(readSeen() === today())
-  const t = today()
-  const days = [
-    ...logs.filter((l) => l.source === 'daily' || l.source === 'app').map((l) => dayKey(new Date(l.occurred_at))),
-    ...checkins.map((c) => c.day),
-    ...tasks.filter((x) => x.completed_at).map((x) => dayKey(new Date(x.completed_at!))),
-  ]
-  if (gone || days.includes(t)) return null
-  const prior = days.filter((d) => d < t)
-  if (!prior.length) return null
-  const last = prior.reduce((a, b) => (a > b ? a : b))
-  const gap = daysBetween(last, t)
-  if (gap < 3) return null
-  const overdue = tasks.filter((x) => openTask(x) && x.due_date && x.due_date < t).length
-  const dismiss = () => { try { localStorage.setItem(seenKey, t) } catch { /* ignore */ } setGone(true) }
-  return (
-    <div class="card soft welcome" style="--accent:var(--mint)">
-      <div class="row between"><h3>Welcome back</h3><button class="icon-btn" aria-label="Dismiss" onClick={dismiss}><Icon name="x" size={18} /></button></div>
-      <p class="muted small" style="margin:6px 0 12px">It’s been {gap} days. Nothing to catch up on: the log only cares about today.{overdue ? ` ${overdue} task${overdue === 1 ? '' : 's'} slipped past their dates, so re-date or drop them when you have a minute.` : ''}</p>
-      <div class="row wrap"><a class="btn primary sm" href={`#/log/${t}`} onClick={dismiss}>Log today</a>{overdue > 0 && <a class="btn sm" href="#/tasks" onClick={dismiss}>See overdue</a>}</div>
+    <div class="moods" role="group" aria-label="Mood right now">
+      {MOODS.map(([v, l, c]) => (
+        <button class={`mood ${picked === v ? 'on' : ''}`} style={`--c:${c}`} onClick={() => log(v)} aria-pressed={picked === v}>
+          <i style={`--s:${0.55 + v / 25}`} /><span>{l}</span>
+        </button>
+      ))}
     </div>
   )
 }
 
-function Focus() {
+function Intention() {
   const m = useStore((s) => s.checkins.find((c) => c.kind === 'morning' && c.day === today()))
-  if (!m?.top_three?.length) return null
+  if (!m?.intention && !m?.top_three?.filter(Boolean).length) return null
   return (
-    <Card title="Top three" icon="target" accent="var(--orange)">
-      {m.top_three.filter(Boolean).map((x, i) => <div class="row" style="padding:7px 0"><span class="badge" style="flex:none">{i + 1}</span><span>{x}</span></div>)}
-    </Card>
+    <div class="intent">
+      {m.intention && <div><span class="faint tiny">Today’s intention</span><div class="i-t">{m.intention}</div></div>}
+      {m.top_three?.filter(Boolean).length ? <ol>{m.top_three.filter(Boolean).map((x) => <li>{x}</li>)}</ol> : null}
+    </div>
   )
 }
 
-function Schedule() {
+/** The big card at the top. What it is depends on the time of day (set in Settings). */
+function Hero() {
+  const prefs = usePrefs()
+  const checkins = useStore((s) => s.checkins)
+  const phase = phaseNow(prefs)
+  const t = today()
+  // The night check-in after midnight still belongs to yesterday.
+  const nightDay = new Date().getHours() < 12 ? dayKey(new Date(Date.now() - 864e5)) : t
+  const morningDone = checkins.some((c) => c.kind === 'morning' && c.day === t)
+  const nightDone = checkins.some((c) => c.kind === 'night' && c.day === nightDay)
+
+  if (phase === 'morning' && !morningDone) return (
+    <a class="hero morning" href="#/checkin/morning">
+      <span class="h-orb"><Icon name="sun" size={30} /></span>
+      <span class="grow"><span class="h-k">Morning check-in</span><h2>How did you sleep?</h2><span class="h-s">Sleep, mood and your top three. About a minute.</span></span>
+      <Icon name="chev" />
+    </a>
+  )
+  if (phase === 'night' && !nightDone) return (
+    <a class="hero night" href="#/checkin/night">
+      <span class="h-orb"><Icon name="moon" size={28} /></span>
+      <span class="grow"><span class="h-k">Night check-in</span><h2>How was today?</h2><span class="h-s">Log the day, one win, and wind down.</span></span>
+      <Icon name="chev" />
+    </a>
+  )
+  return (
+    <section class="hero log">
+      <div class="row between"><span class="h-k">{phase === 'night' ? 'Day wrapped. Anything else?' : 'Quick log'}</span><a class="link small" href={`#/log/${t}`}>Daily log</a></div>
+      <h2 style="margin:4px 0 12px">How are you right now?</h2>
+      <MoodTap />
+      <div class="quick">
+        <SubstanceQuick />
+        <button class="qbtn" style="--c:var(--mint)" onClick={() => setState({ capture: 'journal' })}><Icon name="book" size={18} />Note to self</button>
+        <a class="qbtn" style="--c:var(--pink)" href={`#/log/${t}`}><Icon name="sliders" size={18} />Log the day</a>
+      </div>
+      <Intention />
+    </section>
+  )
+}
+
+/** Counts, not lists: what's due today and what's late, split by area if you want to look closer. */
+function TaskGlance() {
+  const tasks = useStore((s) => s.tasks)
+  const areas = useStore((s) => s.areas)
+  const [open, setOpen] = useState(false)
+  const t = today()
+  const live = tasks.filter((x) => openTask(x) && x.status !== 'inbox')
+  const isToday = (x: typeof live[number]) => x.due_date === t || x.scheduled_for === t || x.status === 'doing'
+  const isLate = (x: typeof live[number]) => !!x.due_date && x.due_date < t
+  const todayN = live.filter(isToday).length
+  const lateN = live.filter(isLate).length
+  const inbox = tasks.filter((x) => x.status === 'inbox').length
+  const doneToday = tasks.filter((x) => x.status === 'done' && x.completed_at && dayKey(new Date(x.completed_at)) === t).length
+  const rows = [...areas.filter((a) => !a.archived), { id: null, key: 'none', name: 'No area', color: 'var(--faint)' }]
+    .map((a) => { const mine = live.filter((x) => (x.area_id ?? null) === a.id); return { a, today: mine.filter(isToday).length, late: mine.filter(isLate).length } })
+    .filter((r) => r.today || r.late)
+  return (
+    <section class="card glance">
+      <button class="g-top" onClick={() => setOpen(!open)} aria-expanded={open}>
+        <span class="g-n" style="--c:var(--violet)"><b>{todayN}</b><span>today</span></span>
+        <span class="g-n" style={`--c:${lateN ? 'var(--coral)' : 'var(--faint)'}`}><b>{lateN}</b><span>overdue</span></span>
+        <span class="g-n" style="--c:var(--mint)"><b>{doneToday}</b><span>done today</span></span>
+        <span class={`g-chev ${open ? 'up' : ''}`}><Icon name="chev" size={18} /></span>
+      </button>
+      {open && (
+        <div class="g-list">
+          {rows.length ? rows.map((r) => (
+            <a href={`#/tasks/${r.a.key}`} class="g-row">
+              <i class="dot" style={`background:${r.a.color}`} /><span class="grow">{r.a.name}</span>
+              {r.today > 0 && <span class="pill">{r.today} today</span>}{r.late > 0 && <span class="pill late">{r.late} late</span>}<Icon name="chev" size={16} />
+            </a>
+          )) : <p class="faint small" style="padding:4px 2px">Nothing due or late.</p>}
+          <a href="#/tasks" class="g-row"><Icon name="tasks" size={18} /><span class="grow">All tasks</span><Icon name="chev" size={16} /></a>
+        </div>
+      )}
+      {inbox > 0 && <a class="g-inbox" href="#/inbox"><Icon name="inbox" size={17} /><span class="grow">{inbox} in your inbox to sort</span><Icon name="chev" size={16} /></a>}
+    </section>
+  )
+}
+
+function NextUp() {
   const events = useStore((s) => s.events)
-  const t = today()
   const now = new Date().toISOString()
-  let list = eventsOn(events, t)
-  let label = 'Today'
-  if (!list.filter((e) => e.all_day || (e.ends_at ?? e.starts_at) > now).length) { list = eventsOn(events, inDays(1)); label = 'Tomorrow' }
+  const t = today()
+  const list = events.filter((e) => (e.all_day ? eventDay(e) >= t : (e.ends_at ?? e.starts_at) > now) && daysUntil(eventDay(e)) <= 1 && e.calendar_name !== 'Canvas')
+    .sort((a, b) => a.starts_at.localeCompare(b.starts_at)).slice(0, 3)
+  if (!list.length) return null
   return (
-    <Card title={`Schedule · ${label}`} icon="cal" accent="var(--sky)" action={<a class="link" href="#/calendar">Week</a>}>
-      {!events.length ? <p class="muted small">Your Google Calendar shows up here once it syncs.</p>
-        : !list.length ? <p class="empty" style="padding:8px">Nothing on the calendar.</p>
-          : list.slice(0, 6).map((e) => (
-            <div class="event" style={`--c:${calColor(e.calendar_name)}`}>
-              <span class="when">{e.all_day ? 'All day' : fmtTime(e.starts_at)}</span><span class="bar-v" />
-              <span class="grow"><div class="e-t">{e.title}</div>{e.location && <div class="faint small ellipsis">{e.location}</div>}</span>
-            </div>
-          ))}
-    </Card>
+    <a class="card nextup" href="#/calendar">
+      {list.map((e) => (
+        <div class="event" style={`--c:${calColor(e.calendar_name)}`}>
+          <span class="when">{eventDay(e) !== t ? 'Tmrw' : e.all_day ? 'All day' : fmtTime(e.starts_at)}</span><span class="bar-v" />
+          <span class="grow ellipsis">{e.title}</span>
+        </div>
+      ))}
+    </a>
   )
 }
 
-function LogSummary() {
-  const metrics = useStore((s) => s.metrics.filter((m) => m.active))
+/** Gaps worth knowing about: a sync that stopped, or something you usually do that hasn't happened in a while. */
+export function useGaps() {
+  const synced = useStore((s) => s.synced_at)
+  const events = useStore((s) => s.events.length)
   const logs = useStore((s) => s.logs)
+  const checkins = useStore((s) => s.checkins)
+  const tasks = useStore((s) => s.tasks)
+  const reviews = useStore((s) => s.reviews)
   const t = today()
-  const logged = metrics.map((m) => ({ m, v: dailySeries(m, logs, [t])[0] })).filter((x) => x.v != null)
-  const days = lastNDays(14)
-  const slipping = metrics.filter((m) => m.role === 'habit' && consistency(dailySeries(m, logs, days)).lastTwoMissed)
+  const out: { icon: string; text: string; href: string; c: string }[] = []
+  if (synced && Date.now() - new Date(synced).getTime() > 6 * 3600e3) out.push({ icon: 'cal', c: 'var(--sky)', href: '#/settings', text: `Google Calendar hasn’t synced since ${relTime(synced)}.` })
+  else if (!synced && !events) out.push({ icon: 'cal', c: 'var(--sky)', href: '#/settings', text: 'Google Calendar hasn’t synced yet.' })
+  const health = logs.filter((l) => l.source === 'health').map((l) => l.occurred_at).sort().pop()
+  if (health && Date.now() - new Date(health).getTime() > 36 * 3600e3) out.push({ icon: 'heart', c: 'var(--mint)', href: '#/settings', text: `No Apple Health data since ${relTime(health)}. Check that your ring synced to Apple Health.` })
+  const logged = logs.filter((l) => l.source === 'daily' || l.source === 'app').map((l) => dayKey(new Date(l.occurred_at))).filter((d) => d < t).sort().pop()
+  if (logged && daysBetween(logged, t) > 2) out.push({ icon: 'sliders', c: 'var(--pink)', href: `#/log/${logged}`, text: `Nothing in your daily log since ${fmtDay(logged)}.` })
+  const ci = checkins.map((c) => c.day).sort().pop()
+  if (ci && daysBetween(ci, t) > 2) out.push({ icon: 'sun', c: 'var(--orange)', href: '#/checkin/morning', text: `No check-ins since ${fmtDay(ci)}.` })
+  const stale = tasks.filter((x) => x.status === 'inbox' && daysBetween(dayKey(new Date(x.created_at)), t) > 3).length
+  if (stale) out.push({ icon: 'inbox', c: 'var(--violet)', href: '#/inbox', text: `${stale} inbox item${stale === 1 ? ' has' : 's have'} waited more than 3 days.` })
+  const lastWs = dayKey(weekStart(new Date(Date.now() - 7 * 864e5)))
+  const wd = new Date().getDay()
+  if (wd >= 1 && wd <= 3 && !reviews.some((r) => r.week_start === lastWs)) out.push({ icon: 'review', c: 'var(--lilac)', href: '#/review', text: `Last week’s review (week of ${fromKey(lastWs).toLocaleDateString([], { month: 'short', day: 'numeric' })}) isn’t done.` })
+  return out
+}
+
+function Gaps() {
+  const gaps = useGaps()
+  if (!gaps.length) return null
   return (
-    <Card title="Daily log" icon="sliders" accent="var(--pink)" action={<span class="faint small">{logged.length}/{metrics.length}</span>}>
-      {logged.length ? <div class="logsum">{logged.map(({ m, v }) => <span style={`--c:${LOG_GROUPS.find((g) => g.key === groupOf(m))!.color}`}>{m.name} {m.kind === 'boolean' ? '✓' : fmtValue(m, v)}</span>)}</div>
-        : <p class="muted small">Nothing logged yet. Fill it in once tonight, no need to track as you go.</p>}
-      {slipping.length > 0 && <p class="small" style="margin-top:10px;color:var(--peach)">Don’t miss twice: {slipping.map((m) => m.name.toLowerCase()).join(', ')}.</p>}
-      <a class="btn block" style="margin-top:12px" href="#/log">{logged.length ? 'Update today’s log' : 'Log today'}</a>
+    <Card title="Needs a look" icon="bolt" accent="var(--gold)">
+      {gaps.map((g) => <a class="gap" href={g.href} style={`--c:${g.c}`}><span class="m-ico"><Icon name={g.icon} size={17} /></span><span class="grow">{g.text}</span><Icon name="chev" size={16} /></a>)}
     </Card>
   )
 }
@@ -118,98 +183,40 @@ function ComingUp() {
   const people = useStore((s) => s.people)
   const goals = useStore((s) => s.goals)
   const areas = useStore((s) => s.areas)
+  const [kd] = useKeyDates()
   type Item = { d: string; title: string; c: string; href: string }
   const items: Item[] = []
-  for (const t of tasks) if (openTask(t) && t.due_date && daysUntil(t.due_date) > 0 && daysUntil(t.due_date) <= 14 && t.priority >= 2) items.push({ d: t.due_date, title: t.title, c: areas.find((a) => a.id === t.area_id)?.color ?? 'var(--violet)', href: '#/tasks' })
-  for (const p of people) { const b = nextBirthday(p); if (b && daysUntil(b) <= 30) items.push({ d: b, title: `${p.name}’s birthday`, c: 'var(--pink)', href: '#/people' }) }
-  for (const g of goals) if (g.status === 'active' && !g.suggested && g.target_date && daysUntil(g.target_date) >= 0 && daysUntil(g.target_date) <= 45) items.push({ d: g.target_date, title: g.title, c: 'var(--gold)', href: '#/goals' })
-  // Syllabus dates (exams up to three weeks out, other deadlines two weeks).
-  const [kd] = useKeyDates()
-  const edu = areas.find((a) => a.key === 'education')?.color ?? 'var(--lilac)'
-  for (const k of kd ?? []) if (!k.done && k.kind !== 'term' && daysUntil(k.day) > 0 && daysUntil(k.day) <= (k.kind === 'exam' ? 21 : 14)) items.push({ d: k.day, title: k.course ? `${k.course}: ${k.title}` : k.title, c: k.kind === 'exam' ? 'var(--pink)' : edu, href: '#/area/education' })
+  for (const t of tasks) if (openTask(t) && t.due_date && daysUntil(t.due_date) > 1 && daysUntil(t.due_date) <= 14 && t.priority >= 3) items.push({ d: t.due_date, title: t.title, c: areas.find((a) => a.id === t.area_id)?.color ?? 'var(--violet)', href: '#/tasks' })
+  for (const p of people) { const b = nextBirthday(p); if (b && daysUntil(b) <= 21) items.push({ d: b, title: `${p.name}’s birthday`, c: 'var(--pink)', href: '#/people' }) }
+  for (const g of goals) if (g.status === 'active' && !g.suggested && g.target_date && daysUntil(g.target_date) >= 0 && daysUntil(g.target_date) <= 30) items.push({ d: g.target_date, title: g.title, c: 'var(--gold)', href: '#/goals' })
+  for (const k of kd ?? []) if (!k.done && (k.kind === 'exam' || k.kind === 'term') && daysUntil(k.day) > 0 && daysUntil(k.day) <= 21) items.push({ d: k.day, title: k.course ? `${k.course}: ${k.title}` : k.title, c: k.kind === 'exam' ? 'var(--pink)' : 'var(--lilac)', href: '#/school' })
   items.sort((a, b) => a.d.localeCompare(b.d))
   if (!items.length) return null
   return (
     <Card title="Coming up" icon="flame" accent="var(--gold)">
-      {items.slice(0, 5).map((i) => {
+      {items.slice(0, 4).map((i) => {
         const n = daysUntil(i.d)
-        return <a class="count" href={i.href} style={`--c:${i.c};color:inherit;text-decoration:none`}><span class="c-n"><b>{n === 0 ? 'Now' : n}</b><span>{n === 0 ? 'today' : n === 1 ? 'day' : 'days'}</span></span><span class="grow"><div class="ellipsis">{i.title}</div><div class="faint small">{fmtDay(i.d)}</div></span></a>
+        return <a class="count" href={i.href} style={`--c:${i.c};color:inherit;text-decoration:none`}><span class="c-n"><b>{n}</b><span>{n === 1 ? 'day' : 'days'}</span></span><span class="grow"><div class="ellipsis">{i.title}</div><div class="faint small">{fmtDay(i.d)}</div></span></a>
       })}
     </Card>
   )
 }
 
-function NextSteps() {
-  const goals = useStore((s) => s.goals.filter((g) => g.status === 'active' && !g.suggested && g.next_step))
-  const ideas = useStore((s) => s.goals.filter((g) => g.status === 'active' && g.suggested).length)
-  if (!goals.length) return ideas ? (
-    <a class="card soft prompt" href="#/goals" style="--accent:var(--gold)">
-      <span class="orb"><Icon name="target" size={22} /></span>
-      <span class="grow"><h3>{ideas} proposed goal{ideas === 1 ? "" : "s"} to look at</h3><p class="muted small">Keep the ones that fit, drop the rest. Each comes with a first step.</p></span>
-      <Icon name="chev" />
-    </a>
-  ) : null
-  return (
-    <Card title="Next steps on goals" icon="compass" accent="var(--gold)" action={<a class="link" href="#/goals">Goals</a>}>
-      {goals.slice(0, 3).map((g) => <div style="padding:7px 0"><div class="faint small">{g.title}</div><div class="row" style="gap:6px;color:var(--peach)"><Icon name="arrow" size={15} />{g.next_step}</div></div>)}
-    </Card>
-  )
-}
-
-function ReviewNudge() {
-  const reviews = useStore((s) => s.reviews)
-  const d = new Date().getDay() // 0 Sun
-  const ws = dayKey(weekStart())
-  const lastWs = dayKey(weekStart(new Date(Date.now() - 7 * 864e5)))
-  const due = (d === 0 || d === 6 || d === 5) ? !reviews.some((r) => r.week_start === ws) : d === 1 ? !reviews.some((r) => r.week_start === lastWs) : false
-  if (!due) return null
-  return (
-    <a class="card prompt" href="#/review" style="--accent:var(--lilac)">
-      <span class="orb cool"><Icon name="review" size={22} /></span>
-      <span class="grow"><h3>Weekly review</h3><p class="muted small">Fifteen minutes to clear your head and set up next week.</p></span><Icon name="chev" />
-    </a>
-  )
-}
-
 export function Today() {
   const profile = useStore((s) => s.profile)
-  const tasks = useStore((s) => s.tasks)
-  const inbox = tasks.filter((t) => t.status === 'inbox').length
-  const [edit, setEdit] = useState<Task | null>(null)
-  const t = today()
-  const due = tasks.filter((x) => openTask(x) && x.status !== 'inbox' && (x.due_date && x.due_date <= t || x.status === 'doing'))
-    .sort((a, b) => (a.due_date ?? '').localeCompare(b.due_date ?? '') || b.priority - a.priority)
-  const doneToday = tasks.filter((x) => x.status === 'done' && x.completed_at && dayKey(new Date(x.completed_at)) === t)
   const name = profile?.display_name || 'Nick'
   const greet = { morning: 'Good morning', afternoon: 'Good afternoon', evening: 'Good evening', night: 'Hey' }[partOfDay()]
   return (
-    <>
+    <div class="home">
       <header class="hello">
         <div class="date">{fmtLongDate()}</div>
         <h1>{greet}, <span class="grad-text">{name}</span></h1>
       </header>
-      <WelcomeBack />
-      <CheckinPrompt />
-      <ReviewNudge />
-      <div class="grid-2">
-        <div>
-          <Focus />
-          <Card title="Today’s tasks" icon="tasks" accent="var(--violet)" action={<a class="link" href="#/tasks">All</a>}>
-            <AddTask defaults={{ due_date: t }} placeholder="Add for today…" />
-            {due.length ? due.map((x) => <TaskRow t={x} onOpen={setEdit} />) : <p class="empty" style="padding:6px">{doneToday.length ? `All clear. ${doneToday.length} done today.` : 'Nothing due today.'}</p>}
-            {due.length > 0 && doneToday.length > 0 && <p class="faint small" style="margin-top:8px">{doneToday.length} done today</p>}
-            {inbox > 0 && <a class="row between" href="#/inbox" style="margin-top:12px;padding:10px 12px;border-radius:14px;background:var(--surface-2);color:inherit;text-decoration:none"><span class="row"><Icon name="inbox" size={18} />{inbox} in your inbox to sort</span><Icon name="chev" size={18} /></a>}
-          </Card>
-          <NextSteps />
-        </div>
-        <div>
-          <Schedule />
-          <LogSummary />
-          <ComingUp />
-        </div>
-      </div>
-      <TaskSheet task={edit} onClose={() => setEdit(null)} />
-      <button class="btn ghost block desk-only" onClick={() => setState({ capture: true })}><Icon name="plus" size={18} />Capture anything (N)</button>
-    </>
+      <Hero />
+      <TaskGlance />
+      <NextUp />
+      <Gaps />
+      <ComingUp />
+    </div>
   )
 }

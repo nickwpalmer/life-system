@@ -8,6 +8,9 @@ import type { Area, Metric, MetricKind, MetricRole } from '../lib/types'
 import { Icon } from '../ui/icons'
 import { Sheet, Switch, PageHead } from '../ui/kit'
 import { HealthSync } from './HealthSync'
+import { usePrefs, savePrefs, LOGOS, logoUrl } from '../lib/prefs'
+import { relTime } from '../lib/dates'
+import { NAV } from '../app'
 
 type Passkey = { id: string; friendly_name?: string; created_at: string; last_used_at?: string }
 
@@ -104,39 +107,124 @@ function AreaEditor({ open, area, onClose }: { open: boolean; area: Area | null;
   )
 }
 
+function Appearance() {
+  const p = usePrefs()
+  return (
+    <section class="card">
+      <div class="card-h"><h2>Look</h2></div>
+      <div class="field"><span>Theme</span><div class="seg">
+        {(['dark', 'light', 'auto'] as const).map((t) => <button class={p.theme === t ? 'on' : ''} onClick={() => savePrefs({ theme: t })}>{t === 'auto' ? 'Match phone' : t[0].toUpperCase() + t.slice(1)}</button>)}
+      </div></div>
+      <div class="field"><span>App icon</span>
+        <div class="logos">{LOGOS.map((l) => <button class={p.logo === l.key ? 'on' : ''} onClick={() => savePrefs({ logo: l.key })} aria-label={l.name}><img src={logoUrl(l.key)} alt="" /><span>{l.name}</span></button>)}</div>
+      </div>
+      <p class="faint small">To see a new icon on your Home Screen, remove Life from the Home Screen and add it again from Safari (Share, then Add to Home Screen). Your data stays put.</p>
+    </section>
+  )
+}
+
+function Windows() {
+  const p = usePrefs()
+  const set = (k: keyof typeof p.windows, v: string) => v && savePrefs({ windows: { ...p.windows, [k]: v } })
+  return (
+    <section class="card">
+      <div class="card-h"><h2>Home through the day</h2></div>
+      <p class="faint small" style="margin-bottom:10px">Home shows the morning check-in, then a quick log, then the night check-in. Pick when each starts.</p>
+      <div class="row">
+        <label class="field grow"><span>Morning</span><input class="input" type="time" value={p.windows.morning} onChange={(e) => set('morning', (e.target as HTMLInputElement).value)} /></label>
+        <label class="field grow"><span>Quick log</span><input class="input" type="time" value={p.windows.log} onChange={(e) => set('log', (e.target as HTMLInputElement).value)} /></label>
+        <label class="field grow"><span>Night</span><input class="input" type="time" value={p.windows.night} onChange={(e) => set('night', (e.target as HTMLInputElement).value)} /></label>
+      </div>
+    </section>
+  )
+}
+
+function TabPicker() {
+  const p = usePrefs()
+  const opts = NAV.filter((n) => !['today', 'settings', 'help'].includes(n.r))
+  const toggle = (r: string) => {
+    const on = p.tabs.includes(r)
+    if (on) { toast('Pick another one first, then remove this'); return }
+    savePrefs({ tabs: [...p.tabs.slice(1), r] })
+  }
+  return (
+    <section class="card">
+      <div class="card-h"><h2>Bottom bar</h2></div>
+      <p class="faint small" style="margin-bottom:10px">Home and Everything are always there. Pick the three in between; the oldest pick drops off.</p>
+      <div class="tabbar-preview">{['today', ...p.tabs, 'more'].map((r) => { const n = NAV.find((x) => x.r === r); return <span><Icon name={n?.icon ?? 'grid'} size={18} />{n?.label ?? 'Everything'}</span> })}</div>
+      <div class="chips" style="margin-top:12px">{opts.map((n) => <button class={`chip ${p.tabs.includes(n.r) ? 'on' : ''}`} style={`--c:${n.c}`} onClick={() => toggle(n.r)}>{n.label}</button>)}</div>
+    </section>
+  )
+}
+
+function Connections() {
+  const synced = useStore((s) => s.synced_at)
+  const demo = useStore((s) => s.demo)
+  const [st, setSt] = useState<{ monarch: string | null; health: string | null; key: boolean } | null>(null)
+  useEffect(() => {
+    if (demo) { setSt({ monarch: new Date(Date.now() - 2 * 864e5).toISOString(), health: null, key: false }); return }
+    Promise.all([
+      supabase.from('fin_accounts').select('as_of').order('as_of', { ascending: false }).limit(1),
+      supabase.from('ingest_keys').select('last_used_at').order('last_used_at', { ascending: false, nullsFirst: false }).limit(1),
+    ]).then(([a, k]) => setSt({ monarch: (a.data?.[0] as { as_of?: string })?.as_of ?? null, health: (k.data?.[0] as { last_used_at?: string })?.last_used_at ?? null, key: !!k.data?.length }))
+  }, [demo])
+  const ago = (iso: string | null) => (iso ? relTime(iso) : null)
+  const fresh = (iso: string | null, h: number) => !!iso && Date.now() - new Date(iso).getTime() < h * 3600e3
+  const rows: [string, string, string, 'ok' | 'warn' | 'off', string?][] = [
+    ['Google Calendar', 'cal', synced ? `Copied ${ago(synced)}, every 2 hours` : 'Not copied yet', synced ? (fresh(synced, 6) ? 'ok' : 'warn') : 'off'],
+    ['Monarch', 'money', st?.monarch ? `Balances from ${ago(st.monarch)}. Claude reads it when asked.` : 'No balances yet', st?.monarch ? (fresh(st.monarch, 24 * 8) ? 'ok' : 'warn') : 'off'],
+    ['Apple Health', 'heart', st?.health ? `Last sent ${ago(st.health)}` : st?.key ? 'Set up, nothing sent yet' : 'Not set up yet (steps below)', st?.health ? (fresh(st.health, 36) ? 'ok' : 'warn') : 'off'],
+    ['Claude', 'sparkle', 'Reads and writes your data, logs every change', 'ok', '#/changes'],
+    ['Supabase', 'lock', 'Your private database. Only you can read it.', 'ok'],
+    ['GitHub', 'link', 'Holds the app’s code (no personal data)', 'ok', 'https://github.com/nickwpalmer/life-system'],
+  ]
+  return (
+    <section class="card">
+      <div class="card-h"><h2>Connections</h2></div>
+      {rows.map(([n, ic, sub, s, href]) => {
+        const inner = <><span class="m-ico"><Icon name={ic} size={18} /></span><span class="grow"><div>{n}</div><div class="faint tiny">{sub}</div></span><i class={`stat ${s}`} aria-label={s === 'ok' ? 'Working' : s === 'warn' ? 'Behind' : 'Not set up'} /></>
+        return href ? <a class="conn" href={href} target={href.startsWith('http') ? '_blank' : undefined} rel="noopener">{inner}</a> : <div class="conn">{inner}</div>
+      })}
+    </section>
+  )
+}
+
 export function Settings() {
   const metrics = useStore((s) => s.metrics)
   const areas = useStore((s) => s.areas)
   const profile = useStore((s) => s.profile)
   const [name, setName] = useState(profile?.display_name ?? '')
   const [pw, setPw] = useState('')
+  const [pwOpen, setPwOpen] = useState(false)
   const [mEdit, setMEdit] = useState<{ open: boolean; m: Metric | null }>({ open: false, m: null })
   const [aEdit, setAEdit] = useState<{ open: boolean; a: Area | null }>({ open: false, a: null })
 
   async function changePw() {
     if (pw.length < 10) { toast('Use at least 10 characters'); return }
     const { error } = await supabase.auth.updateUser({ password: pw })
-    toast(error ? error.message : 'Password updated'); if (!error) setPw('')
+    toast(error ? error.message : 'Password changed'); if (!error) { setPw(''); setPwOpen(false) }
   }
 
   return (
     <>
       <PageHead title="Settings" back="#/more" icon="gear" color="var(--muted)" />
       <section class="card">
-        <div class="card-h"><h2>You</h2></div>
-        <label class="field"><span>What should the app call you?</span>
+        <div class="card-h"><h2>Account</h2></div>
+        <label class="field"><span>Name</span>
           <input class="input" value={name} onInput={(e) => setName((e.target as HTMLInputElement).value)} onBlur={() => saveProfile({ display_name: name.trim() || undefined }).then(() => toast('Saved'))} />
         </label>
-        <p class="faint small">Signed in as {getState().session?.user.email}</p>
+        <div class="row between" style="padding:8px 2px"><span class="muted">Email</span><span class="small">{getState().session?.user.email}</span></div>
+        {!pwOpen ? <button class="btn ghost sm" onClick={() => setPwOpen(true)}>Change password</button> : (
+          <div class="row"><input class="input grow" type="password" autocomplete="new-password" placeholder="New password" value={pw} onInput={(e) => setPw((e.target as HTMLInputElement).value)} /><button class="btn" onClick={changePw}>Save</button></div>
+        )}
       </section>
 
+      <Appearance />
+      <TabPicker />
+      <Windows />
       <Security />
+      <Connections />
       <HealthSync />
-
-      <section class="card">
-        <div class="card-h"><h2>On your Mac</h2></div>
-        <p class="muted small" style="line-height:1.55">Open this page in Safari, then choose File, Add to Dock. Your iPhone passkey syncs through iCloud Keychain, so the Mac signs in with Touch ID or your iPhone. If it doesn’t show up, sign in with your password once and tap “Add Face ID on this device” above. Press N anywhere to capture, and 1 to 7 to jump between screens.</p>
-      </section>
 
       <section class="card">
         <div class="card-h"><h2>Trackers</h2><button class="btn ghost sm" onClick={() => setMEdit({ open: true, m: null })}>Add</button></div>
@@ -162,13 +250,9 @@ export function Settings() {
         ))}
       </section>
 
-      <section class="card">
-        <div class="card-h"><h2>Password</h2></div>
-        <div class="row"><input class="input grow" type="password" autocomplete="new-password" placeholder="New password" value={pw} onInput={(e) => setPw((e.target as HTMLInputElement).value)} /><button class="btn" onClick={changePw}>Save</button></div>
-      </section>
-
+      <a class="card prompt" href="#/help" style="--accent:var(--sky)"><span class="orb"><Icon name="help" size={20} /></span><span class="grow"><h3>Help</h3><p class="muted small">Mac setup, shortcuts, changing the icon</p></span><Icon name="chev" /></a>
       <button class="btn ghost danger block" onClick={async () => { await supabase.auth.signOut(); clearData() }}><Icon name="out" size={18} /> Sign out</button>
-      <p class="faint small" style="text-align:center;margin-top:16px">Life v0.2</p>
+      <p class="faint small" style="text-align:center;margin-top:16px">Life v0.3</p>
 
       <MetricEditor open={mEdit.open} metric={mEdit.m} onClose={() => setMEdit({ open: false, m: null })} />
       <AreaEditor open={aEdit.open} area={aEdit.a} onClose={() => setAEdit({ open: false, a: null })} />
