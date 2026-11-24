@@ -97,6 +97,7 @@ export function TimedLogSheet({ m, day, onClose }: { m: Metric | null; day: stri
 /** Trackers grouped as in the daily log. `only` limits to some groups (the night check-in uses this). */
 export function LogGroups({ day, only, compact }: { day: string; only?: string[]; compact?: boolean }) {
   const metrics = useStore((s) => s.metrics.filter((m) => m.active).sort((a, b) => a.sort - b.sort))
+  const logs = useStore((s) => s.logs)
   const [timed, setTimed] = useState<Metric | null>(null)
   const groups = LOG_GROUPS.filter((g) => !only || only.includes(g.key))
   return (
@@ -105,8 +106,14 @@ export function LogGroups({ day, only, compact }: { day: string; only?: string[]
         const ms = metrics.filter((m) => groupOf(m) === g.key)
         if (!ms.length) return null
         const body = ms.map((m) => <LogRow m={m} day={day} onTimed={setTimed} />)
-        return compact ? <div class="log-group"><div class="group-h" style={`color:${g.color}`}>{g.label}</div>{body}</div>
-          : <section class="card log-group" style={`--accent:${g.color}`}><div class="card-h"><h2 style={`color:${g.color}`}>{g.label}</h2></div>{body}</section>
+        const open = g.key === 'vices' ? ms.filter((m) => dailySeries(m, logs, [day])[0] == null) : []
+        const clear = open.length > 0 && (
+          <button class="chip small" style="margin-left:auto" onClick={() => { haptic(); open.forEach((m) => setDaily(m, day, 0)); toast(`Logged none for ${open.length === ms.length ? 'all vices' : open.map((m) => m.name.toLowerCase()).join(', ')}`) }}>
+            <Icon name="check" size={14} /> None {day === today() ? 'today' : 'that day'}
+          </button>
+        )
+        return compact ? <div class="log-group"><div class="group-h row" style={`color:${g.color}`}>{g.label}{clear}</div>{body}</div>
+          : <section class="card log-group" style={`--accent:${g.color}`}><div class="card-h"><h2 style={`color:${g.color}`}>{g.label}</h2>{clear}</div>{body}</section>
       })}
       <TimedLogSheet m={timed} day={day} onClose={() => setTimed(null)} />
     </>
@@ -136,6 +143,7 @@ export function DailyLog({ day }: { day: string }) {
         </div>
       )}
       <div class="grid-2"><div><LogGroups day={day} only={['mind', 'body']} /></div><div><LogGroups day={day} only={['habits', 'vices', 'money', 'other']} /></div></div>
+      <p class="faint small" style="text-align:center;margin:4px 0 20px">Skip anything you don’t feel like logging. If a tracker never earns its place, <a class="link" href="#/settings">turn it off</a>.</p>
       <p class="faint small" style="text-align:center">Saves as you go. Changes sync in under a second.</p>
     </>
   )

@@ -9,6 +9,7 @@ import { Icon } from '../ui/icons'
 import { PageHead, Card, ScalePicker, ListInputs, burst } from '../ui/kit'
 import { TaskRow, TaskSheet, openTask } from './Tasks'
 import { goalProgress } from './Goals'
+import { CompassCard } from './Compass'
 
 /** Which week to review: Fri to Sun is this week; Mon to Thu is last week unless it's done. */
 function targetWeek(reviews: Review[]) {
@@ -113,6 +114,7 @@ export function WeeklyReview() {
         </div>
       </div>}
 
+      {step === 2 && <CompassCard compact />}
       {step === 2 && <Card title="Goals" icon="target" accent="var(--gold)" action={<a class="link" href="#/goals">Edit goals</a>}>
         {activeGoals.length ? activeGoals.map((g) => {
           const { p, label } = goalProgress(g)

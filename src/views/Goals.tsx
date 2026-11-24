@@ -5,6 +5,7 @@ import { fmtShort, daysUntil, today } from '../lib/dates'
 import type { Goal } from '../lib/types'
 import { Icon } from '../ui/icons'
 import { Sheet, PageHead, Ring, Card, burst } from '../ui/kit'
+import { CompassCard } from './Compass'
 
 export function goalProgress(g: Goal) {
   const ts = getState().tasks.filter((t) => t.goal_id === g.id && t.status !== 'dropped')
@@ -91,6 +92,7 @@ export function Goals() {
   return (
     <>
       <PageHead title="Goals" sub="A few that matter, each with a next step." icon="target" color="var(--gold)" action={<button class="icon-btn" aria-label="New goal" onClick={() => setEdit('new')}><Icon name="plus" /></button>} />
+      <CompassCard />
       {suggested.length > 0 && (
         <Card title="Ideas from what you’ve told me" icon="sparkle" accent="var(--lilac)" class="soft">
           <p class="muted small" style="margin-bottom:6px">My guesses, not yours yet. Keep the ones that fit and reword them however you like.</p>

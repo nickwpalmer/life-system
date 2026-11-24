@@ -1,5 +1,5 @@
 import { useStore, setState } from '../lib/store'
-import { today, fmtLongDate, partOfDay, checkinKindNow, checkinDay, fmtTime, daysUntil, fmtDay, weekStart, dayKey, inDays, lastNDays } from '../lib/dates'
+import { today, fmtLongDate, partOfDay, checkinKindNow, checkinDay, fmtTime, daysUntil, daysBetween, fmtDay, weekStart, dayKey, inDays, lastNDays } from '../lib/dates'
 import { dailySeries, fmtValue, consistency, LOG_GROUPS, groupOf } from '../lib/metrics'
 import { eventsOn, calColor, nextBirthday } from '../lib/cal'
 import { Icon } from '../ui/icons'
@@ -29,6 +29,36 @@ function CheckinPrompt() {
       <span class="grow"><h3>{morning ? 'Morning check-in' : 'Night check-in'}</h3><p class="muted small">{morning ? 'Sleep, mood and your top three. About a minute.' : 'Log the day, a win, and wind down.'}</p></span>
       <Icon name="chev" />
     </a>
+  )
+}
+
+const seenKey = 'wb-dismissed'
+function readSeen() { try { return localStorage.getItem(seenKey) } catch { return null } }
+
+/** After a few quiet days: no streak shaming, just a clean restart. */
+function WelcomeBack() {
+  const logs = useStore((s) => s.logs)
+  const checkins = useStore((s) => s.checkins)
+  const tasks = useStore((s) => s.tasks)
+  const [gone, setGone] = useState(readSeen() === today())
+  const t = today()
+  const days = [
+    ...logs.filter((l) => l.source === 'daily' || l.source === 'app').map((l) => dayKey(new Date(l.occurred_at))),
+    ...checkins.map((c) => c.day),
+    ...tasks.filter((x) => x.completed_at).map((x) => dayKey(new Date(x.completed_at!))),
+  ].filter((d) => d < t)
+  if (gone || !days.length || days.some((d) => d === t)) return null
+  const last = days.reduce((a, b) => (a > b ? a : b))
+  const gap = daysBetween(last, t)
+  if (gap < 3) return null
+  const overdue = tasks.filter((x) => openTask(x) && x.due_date && x.due_date < t).length
+  const dismiss = () => { try { localStorage.setItem(seenKey, t) } catch { /* ignore */ } setGone(true) }
+  return (
+    <div class="card soft welcome" style="--accent:var(--mint)">
+      <div class="row between"><h3>Welcome back</h3><button class="icon-btn" aria-label="Dismiss" onClick={dismiss}><Icon name="x" size={18} /></button></div>
+      <p class="muted small" style="margin:6px 0 12px">It’s been {gap} days. Nothing to catch up on: the log only cares about today.{overdue ? ` ${overdue} task${overdue === 1 ? '' : 's'} slipped past their dates, so re-date or drop them when you have a minute.` : ''}</p>
+      <div class="row wrap"><a class="btn primary sm" href={`#/log/${t}`} onClick={dismiss}>Log today</a>{overdue > 0 && <a class="btn sm" href="#/tasks" onClick={dismiss}>See overdue</a>}</div>
+    </div>
   )
 }
 
@@ -144,6 +174,7 @@ export function Today() {
         <div class="date">{fmtLongDate()}</div>
         <h1>{greet}, <span class="grad-text">{name}</span></h1>
       </header>
+      <WelcomeBack />
       <CheckinPrompt />
       <ReviewNudge />
       <div class="grid-2">
