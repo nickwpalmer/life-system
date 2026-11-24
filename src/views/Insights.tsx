@@ -75,8 +75,8 @@ export function Insights() {
       {!anyData && <div class="card soft"><p class="small">Charts fill in as you log. A week of nightly logs is enough for the first patterns.</p></div>}
       <div class="grid-2">
         <div>
-          <Card title="Mood, energy, anxiety" icon="heart" accent="var(--pink)">
-            <LineChart days={days} min={1} max={10} series={[{ label: 'Mood', color: '#ff8cc8', values: mood }, { label: 'Energy', color: '#ffd66b', values: energy }, { label: 'Anxiety', color: '#8fc4ff', values: anx }]} />
+          <Card title="Mood, energy, stress" icon="heart" accent="var(--pink)">
+            <LineChart days={days} min={1} max={10} series={[{ label: 'Mood', color: '#ff8cc8', values: mood }, { label: 'Energy', color: '#ffd66b', values: energy }, { label: 'Stress', color: '#8fc4ff', values: anx }]} />
             <div class="legend"><span><i class="dot" style="background:#ff8cc8" /> Mood</span><span><i class="dot" style="background:#ffd66b" /> Energy</span><span><i class="dot" style="background:#8fc4ff" /> Anxiety</span></div>
           </Card>
           <Card title="Sleep" icon="moon" accent="var(--sky)">

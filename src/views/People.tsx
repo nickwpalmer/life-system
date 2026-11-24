@@ -7,6 +7,30 @@ import type { Person } from '../lib/types'
 import { Icon } from '../ui/icons'
 import { Sheet, PageHead, Card } from '../ui/kit'
 
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+/** Month and day, year optional. Stored as MM-DD, or YYYY-MM-DD when the year is known. */
+function BirthdayInput({ value, onChange }: { value: string | null; onChange: (v: string | null) => void }) {
+  const parts = (value ?? '').split('-')
+  const [y, m, d] = parts.length === 3 ? parts : ['', parts[0] ?? '', parts[1] ?? '']
+  const put = (yy: string, mm: string, dd: string) => {
+    if (!mm || !dd) { onChange(null); return }
+    const md = `${mm.padStart(2, '0')}-${dd.padStart(2, '0')}`
+    onChange(/^\d{4}$/.test(yy) ? `${yy}-${md}` : md)
+  }
+  return (
+    <div class="row" style="gap:8px">
+      <select class="input grow" aria-label="Birthday month" value={m} onChange={(e) => put(y, (e.target as HTMLSelectElement).value, d || '1')}>
+        <option value="">Month</option>{MONTHS.map((n, i) => <option value={String(i + 1).padStart(2, '0')}>{n}</option>)}
+      </select>
+      <select class="input" style="width:84px" aria-label="Birthday day" value={d} onChange={(e) => put(y, m || '01', (e.target as HTMLSelectElement).value)}>
+        <option value="">Day</option>{Array.from({ length: 31 }, (_, i) => String(i + 1).padStart(2, '0')).map((n) => <option value={n}>{Number(n)}</option>)}
+      </select>
+      <input class="input" style="width:96px" inputMode="numeric" placeholder="Year" aria-label="Birth year (optional)" value={y} onChange={(e) => put((e.target as HTMLInputElement).value.trim(), m, d)} />
+      {value && <button class="icon-btn sm" aria-label="Clear birthday" onClick={() => onChange(null)}><Icon name="x" size={14} /></button>}
+    </div>
+  )
+}
+
 /** Mounted once in the app shell: opens a person from anywhere their name shows up. */
 export function GlobalPersonSheet() {
   const id = useStore((s) => s.person)
@@ -76,7 +100,7 @@ function Editor({ person, onClose }: { person: Person | 'new' | null; onClose: (
         {f.phone && <a class="chip" href={`sms:${f.phone.replace(/[^\d+]/g, '')}`}>Text</a>}
         {f.email && <a class="chip" href={`mailto:${f.email}`}>Email</a>}
       </div>}
-      <label class="field"><span>Birthday</span><input class="input" type="date" value={f.birthday && f.birthday.length > 5 ? f.birthday : ''} onInput={(e) => setF({ ...f, birthday: (e.target as HTMLInputElement).value || null })} /></label>
+      <div class="field"><span>Birthday</span><BirthdayInput value={f.birthday ?? null} onChange={(v) => setF({ ...f, birthday: v })} /></div>
       <div class="field"><span>Reach out every</span><div class="chips">{[[null, 'No reminder'], [7, 'Week'], [14, '2 weeks'], [30, 'Month'], [90, '3 months']].map(([d, l]) => <button class={`chip ${f.contact_every_days === d ? 'on' : ''}`} onClick={() => setF({ ...f, contact_every_days: d as number | null })}>{l}</button>)}</div></div>
       <label class="field"><span>Notes</span><textarea class="input" placeholder="Gift ideas, what they’re going through, what to ask about" value={f.notes ?? ''} onInput={(e) => setF({ ...f, notes: (e.target as HTMLTextAreaElement).value })} /></label>
       <button class="btn primary block" onClick={save}>Save</button>
