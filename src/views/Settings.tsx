@@ -9,7 +9,7 @@ import { Icon } from '../ui/icons'
 import { Sheet, Switch, PageHead } from '../ui/kit'
 import { syncAll } from '../lib/sync'
 import { usePrefs, savePrefs, LOGOS, logoUrl } from '../lib/prefs'
-import { relTime } from '../lib/dates'
+import { relTime, fmtShort, daysBetween, today, dayKey } from '../lib/dates'
 import { NAV } from '../app'
 
 type Passkey = { id: string; friendly_name?: string; created_at: string; last_used_at?: string }
@@ -189,20 +189,22 @@ function TravelPay() {
 function Connections() {
   const synced = useStore((s) => s.synced_at)
   const demo = useStore((s) => s.demo)
-  const [st, setSt] = useState<{ monarch: string | null; health: string | null; key: boolean } | null>(null)
+  const [st, setSt] = useState<{ monarch: string | null; health: string | null; key: boolean; ring: string | null } | null>(null)
   useEffect(() => {
-    if (demo) { setSt({ monarch: new Date(Date.now() - 2 * 864e5).toISOString(), health: null, key: false }); return }
+    if (demo) { setSt({ monarch: new Date(Date.now() - 2 * 864e5).toISOString(), health: null, key: false, ring: dayKey(new Date(Date.now() - 864e5)) }); return }
     Promise.all([
       supabase.from('fin_accounts').select('as_of').order('as_of', { ascending: false }).limit(1),
       supabase.from('ingest_keys').select('last_used_at').order('last_used_at', { ascending: false, nullsFirst: false }).limit(1),
-    ]).then(([a, k]) => setSt({ monarch: (a.data?.[0] as { as_of?: string })?.as_of ?? null, health: (k.data?.[0] as { last_used_at?: string })?.last_used_at ?? null, key: !!k.data?.length }))
+      supabase.from('ring_days').select('day').order('day', { ascending: false }).limit(1),
+    ]).then(([a, k, r]) => setSt({ monarch: (a.data?.[0] as { as_of?: string })?.as_of ?? null, health: (k.data?.[0] as { last_used_at?: string })?.last_used_at ?? null, key: !!k.data?.length, ring: (r.data?.[0] as { day?: string })?.day ?? null }))
   }, [demo])
   const ago = (iso: string | null) => (iso ? relTime(iso) : null)
   const fresh = (iso: string | null, h: number) => !!iso && Date.now() - new Date(iso).getTime() < h * 3600e3
   const rows: [string, string, string, 'ok' | 'warn' | 'off', string?][] = [
     ['Google Calendar', 'cal', synced ? `Copied ${ago(synced)}, every 2 hours` : 'Not copied yet', synced ? (fresh(synced, 6) ? 'ok' : 'warn') : 'off'],
     ['Monarch', 'money', st?.monarch ? `Balances from ${ago(st.monarch)}. Claude reads it when asked.` : 'No balances yet', st?.monarch ? (fresh(st.monarch, 24 * 8) ? 'ok' : 'warn') : 'off'],
-    ['Apple Health', 'heart', st?.health ? `Last sent ${ago(st.health)}` : st?.key ? 'Set up, nothing sent yet' : 'Not set up yet. Tap for the steps.', st?.health ? (fresh(st.health, 36) ? 'ok' : 'warn') : 'off', '#/help/health'],
+    ['Ultrahuman ring', 'pulse', st?.ring ? `Newest night: ${fmtShort(st.ring)}. Pulled morning and evening${daysBetween(st.ring, today()) > 2 ? '; open the Ultrahuman app so the ring syncs' : ''}.` : 'Not switched on yet. Tap for the steps.', st?.ring ? (daysBetween(st.ring, today()) <= 2 ? 'ok' : 'warn') : 'off', '#/help/health'],
+    ['Apple Health', 'heart', st?.health ? `Last sent ${ago(st.health)}` : st?.key ? 'Set up, nothing sent yet' : st?.ring ? 'Optional backup to the ring. Tap for the steps.' : 'Not set up yet. Tap for the steps.', st?.health ? (fresh(st.health, 36) ? 'ok' : 'warn') : 'off', '#/help/health'],
     ['Claude', 'sparkle', 'Reads and writes your data, logs every change', 'ok', '#/changes'],
     ['Supabase', 'lock', 'Your private database. Only you can read it.', 'ok'],
     ['GitHub', 'link', 'Holds the app’s code (no personal data)', 'ok', 'https://github.com/nickwpalmer/life-system'],
