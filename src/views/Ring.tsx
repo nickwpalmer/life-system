@@ -1,4 +1,9 @@
-import { useRows, registerDemo } from '../lib/rows'
+import { useState } from 'preact/hooks'
+import { useRows, registerDemo, reloadAll } from '../lib/rows'
+import { supabase } from '../lib/supabase'
+import { getState, toast } from '../lib/store'
+import { bootstrap } from '../lib/db'
+import { Icon } from '../ui/icons'
 import { lastNDays, inDays, fmtShort, relTime } from '../lib/dates'
 import { LineChart } from '../ui/charts'
 import { Card } from '../ui/kit'
@@ -14,6 +19,26 @@ registerDemo('ring_days', () => Array.from({ length: 30 }, (_, i) => {
   const w = Math.sin(i / 3)
   return { id: `rd${i}`, day: inDays(-i), fetched_at: new Date().toISOString(), vals: { sleep_hours: 7 + w * 0.6, sleep_score: 78 + Math.round(w * 8), hrv: 52 + Math.round(w * 9), resting_hr: 56 - Math.round(w * 3), recovery_index: 70 + Math.round(w * 12), movement_index: 60 + Math.round(Math.cos(i) * 10), vo2_max: 44, deep_h: 1.4, rem_h: 1.7, sleep_efficiency: 89, temp_deviation: Math.round(w * 30) / 100, spo2: 97 } }
 }) as never)
+
+/** Asks the ring-sync edge function to pull the last 3 days from Ultrahuman right now, then refreshes. */
+function SyncRing() {
+  const [busy, setBusy] = useState(false)
+  const go = async () => {
+    if (busy) return
+    if (getState().demo) { toast('Ring synced (demo)'); return }
+    setBusy(true)
+    try {
+      const { data, error } = await supabase.functions.invoke('ring-sync', { method: 'POST' })
+      if (error) throw error
+      if (data?.setup) { toast('One setup step left: see Help › Ultrahuman ring'); location.hash = '#/help/health'; return }
+      await Promise.all([reloadAll(), bootstrap(true)])
+      const first = (data?.days ?? []).find((d: { note?: string }) => d.note && d.note !== 'not synced yet')
+      toast(data?.latest ? `Ring synced through ${fmtShort(data.latest)}` : first ? `Couldn’t sync: ${first.note}` : 'Nothing new. Open the Ultrahuman app so the ring uploads, then try again.')
+    } catch (e) { toast(`Couldn’t reach the ring sync: ${(e as Error).message}`) }
+    finally { setBusy(false) }
+  }
+  return <button class={`btn ghost sm ${busy ? 'busy' : ''}`} onClick={go} disabled={busy} aria-label="Sync ring now"><Icon name="history" size={15} />{busy ? 'Syncing…' : 'Sync'}</button>
+}
 
 const hm = (h?: number) => (h == null ? '–' : `${Math.floor(h)}h ${Math.round((h % 1) * 60)}m`)
 const n0 = (x?: number) => (x == null ? '–' : `${Math.round(x)}`)
@@ -34,7 +59,8 @@ export function RingPanel() {
   const s = (k: keyof V) => days.map((d) => byDay.get(d)?.[k] ?? null)
   const tile = (label: string, val: string, c: string) => <div class="stat" style={`--c:${c}`}><div class="s-val">{val}</div><div class="s-lbl">{label}</div></div>
   return (
-    <Card title="Ring" icon="pulse" accent="var(--mint)" action={<span class="faint small">{fmtShort(latest.day)} · pulled {relTime(latest.fetched_at)}</span>}>
+    <Card title="Ring" icon="pulse" accent="var(--mint)" action={<SyncRing />}>
+      <div class="faint small" style="margin:-4px 0 10px">{fmtShort(latest.day)} · pulled {relTime(latest.fetched_at)}</div>
       <div class="stat-row four">
         {tile('Recovery', n0(v.recovery_index), 'var(--mint)')}
         {tile('Sleep', hm(v.sleep_hours), 'var(--violet)')}

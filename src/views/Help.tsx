@@ -35,13 +35,19 @@ export function Help({ section }: { section?: string }) {
       <div id="health"><HealthSync /></div>
       <section class="card" style="--accent:var(--mint)">
         <div class="card-h"><h2>Ultrahuman ring, direct</h2></div>
-        <p class="muted small" style="margin-bottom:10px">More than Apple Health passes along: recovery, sleep stages, VO2 max and skin temperature, pulled straight from Ultrahuman every morning and evening. No phone needed. It’s built and waiting for a token.</p>
+        <p class="muted small" style="margin-bottom:10px">More than Apple Health passes along: recovery, sleep stages, VO2 max and skin temperature, pulled straight from Ultrahuman every morning and evening. No phone needed. It’s on, and pulls automatically.</p>
         <ol class="steps small">
           <li>Make a token: sign in at <b>vision.ultrahuman.com</b> with your app email, then <b>Developer › Personal API Tokens</b>. Copy it. Treat it like a password.</li>
           <li>On GitHub, open your private <b>life-system-backups</b> repo, then <b>Settings › Secrets and variables › Actions › New repository secret</b>. Name it <code>ULTRAHUMAN_TOKEN</code>, paste the token as the value, and tap <b>Add secret</b>.</li>
           <li>Tell Claude it’s in. Claude runs a test pull, checks the numbers and fills in past days.</li>
         </ol>
-        <p class="faint tiny">When the ring and Apple Health both have a day, the ring’s number is the one kept. The Shortcut can stay on as a backup.</p>
+        <p class="muted small" style="margin:12px 0 6px"><b>Sync button.</b> The <b>Sync</b> button on the Ring card (Body &amp; health) pulls the last 3 days on the spot. It needs the same token saved once more, in Supabase:</p>
+        <ol class="steps small">
+          <li>Open <b>supabase.com/dashboard</b>, then your <b>life-system</b> project.</li>
+          <li><b>Edge Functions › Secrets</b> (or Project Settings › Edge Functions), then <b>Add new secret</b>. Name it <code>ULTRAHUMAN_TOKEN</code>, paste the token, and save.</li>
+          <li>If Ultrahuman Vision won’t show the old token again, make a new one and put it in both GitHub and Supabase.</li>
+        </ol>
+        <p class="faint tiny">The ring only uploads when its phone app syncs, so open the Ultrahuman app first if Sync finds nothing new. When the ring and Apple Health both have a day, the ring’s number is the one kept. The Shortcut can stay on as a backup.</p>
       </section>
       <p class="faint small" style="text-align:center">Anything else, just ask Claude.</p>
     </>
