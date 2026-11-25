@@ -25,12 +25,14 @@ function Intention() {
 function Hero() {
   const prefs = usePrefs()
   const checkins = useStore((s) => s.checkins)
-  const phase = phaseNow(prefs)
+  // Demo only: ?hero=night or ?hero=morning shows that card, so its look can be checked at any hour.
+  const force = useStore((s) => s.demo) ? new URLSearchParams(location.search).get('hero') : null
+  const phase = force ?? phaseNow(prefs)
   const t = today()
   // The night check-in after midnight still belongs to yesterday.
   const nightDay = new Date().getHours() < 12 ? dayKey(new Date(Date.now() - 864e5)) : t
-  const morningDone = checkins.some((c) => c.kind === 'morning' && c.day === t)
-  const nightDone = checkins.some((c) => c.kind === 'night' && c.day === nightDay)
+  const morningDone = !force && checkins.some((c) => c.kind === 'morning' && c.day === t)
+  const nightDone = !force && checkins.some((c) => c.kind === 'night' && c.day === nightDay)
   if (phase === 'morning' && !morningDone) return (
     <a class="hero morning" href="#/checkin/morning">
       <span class="h-orb"><Icon name="sun" size={30} /></span>
