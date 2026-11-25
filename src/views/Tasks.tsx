@@ -47,6 +47,10 @@ export function TaskRow({ t, onOpen, process }: { t: Task; onOpen: (t: Task) => 
   const a = areaById(t.area_id)
   const done = t.status === 'done'
   const goal = useStore((s) => s.goals.find((g) => g.id === t.goal_id))
+  const kids = useStore((s) => s.tasks.filter((x) => x.parent_id === t.id && x.status !== 'dropped'))
+  // An undated step lives inside its open parent, like TickTick's subtasks.
+  const tucked = useStore((s) => !!t.parent_id && t.status === 'open' && !t.due_date && !!s.tasks.find((x) => x.id === t.parent_id && openTask(x)))
+  if (tucked && !process) return null
   function toggle(e: Event) {
     e.stopPropagation(); haptic()
     if (!done) burst(e.currentTarget as Element)
@@ -61,6 +65,7 @@ export function TaskRow({ t, onOpen, process }: { t: Task; onOpen: (t: Task) => 
         <div class="t-title"><PeopleText text={t.title} /></div>
         <div class="t-meta">
           {dueLabel(t)}
+          {kids.length > 0 && <span class="row" style="gap:3px"><Icon name="layers" size={12} />{kids.filter((x) => x.status === 'done').length}/{kids.length} steps</span>}
           {t.recurrence && <span class="row" style="gap:3px" title={repeatLabel(t.recurrence) ?? ''}><Icon name="repeat" size={12} />{repeatLabel(t.recurrence)}</span>}
           {(() => { const c = checklist(t.notes); return c.length ? <span class="row" style="gap:3px"><Icon name="list" size={12} />{c.filter((x) => x.done).length}/{c.length}</span> : null })()}
           {a && <span class="pill" style={`--c:${a.color}`}>{a.name}</span>}
