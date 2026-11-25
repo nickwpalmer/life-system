@@ -5,6 +5,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 // Served from https://nickwpalmer.github.io/life-system/
 export default defineConfig({
   base: '/life-system/',
+  define: { __BUILD__: JSON.stringify(new Date().toISOString()) },
   plugins: [
     preact(),
     VitePWA({

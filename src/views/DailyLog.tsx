@@ -95,7 +95,7 @@ export function TimedLogSheet({ m, day, onClose }: { m: Metric | null; day: stri
 }
 
 /**
- * Numbers that arrive on their own (Apple Health, spending from Monarch) show as read-only tiles.
+ * Numbers that arrive on their own (the ring, spending from Monarch) show as read-only tiles.
  * "Fix a number" opens the usual rows for when a sync is missing or wrong.
  */
 const SYNCED = new Set(['sleep_score', 'hrv', 'resting_hr', 'steps'])
@@ -127,7 +127,7 @@ export function LogGroups({ day, only, compact }: { day: string; only?: string[]
         const synced = ms.filter(isSynced), manual = ms.filter((m) => !isSynced(m))
         const body = <>
           {manual.map((m) => <LogRow m={m} day={day} onTimed={setTimed} />)}
-          {synced.length > 0 && !compact && <SyncedTiles ms={synced} day={day} color={g.color} from={g.key === 'money' ? 'Monarch' : 'Apple Health'} onTimed={setTimed} />}
+          {synced.length > 0 && !compact && <SyncedTiles ms={synced} day={day} color={g.color} from={g.key === 'money' ? 'Monarch' : 'your ring'} onTimed={setTimed} />}
         </>
         if (compact && !manual.length) return null
         const clear = g.key === 'money' && !compact ? <a class="faint small" style="margin-left:auto" href="#/money">Money</a> : null

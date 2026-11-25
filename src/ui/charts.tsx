@@ -16,14 +16,16 @@ function smoothPath(pts: [number, number][]) {
 }
 
 /** Smooth line chart; gaps (null) split a line into segments. */
-export function LineChart({ days, series, min = 0, max }: { days: string[]; series: Series[]; min?: number; max?: number }) {
+/** marks: rows of dots under the chart, one per day something happened (substances, say). */
+export function LineChart({ days, series, min = 0, max, marks = [], hideAxis }: { days: string[]; series: Series[]; min?: number; max?: number; marks?: { color: string; days: Set<string> }[]; hideAxis?: boolean }) {
+  const HH = H + marks.length * 11 + (marks.length ? 4 : 0)
   const all = series.flatMap((s) => s.values.filter((v): v is number => v != null))
   const hi = max ?? Math.max(1, ...all)
   const x = (i: number) => PAD.l + (i * (W - PAD.l - PAD.r)) / Math.max(1, days.length - 1)
   const y = (v: number) => PAD.t + (1 - (v - min) / (hi - min || 1)) * (H - PAD.t - PAD.b)
   const ticks = [min, (min + hi) / 2, hi]
   return (
-    <svg class="chart" viewBox={`0 0 ${W} ${H}`} role="img">
+    <svg class="chart" viewBox={`0 0 ${W} ${HH}`} role="img">
       <defs>
         {series.map((s, i) => (
           <linearGradient id={`fill${i}`} x1="0" y1="0" x2="0" y2="1">
@@ -35,7 +37,7 @@ export function LineChart({ days, series, min = 0, max }: { days: string[]; seri
       {ticks.map((t) => (
         <g>
           <line x1={PAD.l} x2={W - PAD.r} y1={y(t)} y2={y(t)} stroke="rgba(255,255,255,0.06)" />
-          <text x={PAD.l - 6} y={y(t) + 3} text-anchor="end">{Math.round(t * 10) / 10}</text>
+          {!hideAxis && <text x={PAD.l - 6} y={y(t) + 3} text-anchor="end">{Math.round(t * 10) / 10}</text>}
         </g>
       ))}
       {[0, Math.floor((days.length - 1) / 2), days.length - 1].map((i) => (
@@ -62,6 +64,7 @@ export function LineChart({ days, series, min = 0, max }: { days: string[]; seri
           </g>
         )
       })}
+    {marks.map((m, mi) => days.map((d, di) => m.days.has(d) && <circle cx={x(di)} cy={H + 6 + mi * 11} r="3.2" fill={m.color} />))}
     </svg>
   )
 }

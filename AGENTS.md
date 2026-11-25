@@ -41,7 +41,8 @@ select id, kind, change_id, body, created_at from claude_inbox where status = 'o
 | Something taken (coffee, a drink, a supplement) | `substance_logs` | `substance`, `amount`, `unit`, `occurred_at`; `time_known=false` if no time given (use local noon). See Substances. |
 | A document or ID-type fact (insurance, registration, W-2) | `records` | See Records. If it belongs to the car or the apartment, set `asset_id` (see Assets). |
 | Anything about the car or the apartment (a repair, a to-do, a document) | `assets` + related tables | See Assets. |
-| A reference note, list or how-to | `notes` | `title`, `body`. |
+| A reference note, list or how-to | `notes` | `title`, `body`. An idea gets `tags = '{idea}'` and shows under Notes > Ideas. |
+| A book they're reading or want to | `books` | `title`, `author`, `status` in reading, next, paused, done, `page`, `pages`, `cover_url`, `notes`, `sort`. Update `page` when they say where they are. |
 | A person, birthday, keep-in-touch | `people` | `name`, `relation`, `org`, `phone`, `email`, `birthday`, `contact_every_days`, `last_contact`, `notes`. Names in task titles link to the person's card, so use the same spelling. |
 | An outcome they want | `goals` | `status='active'`; if you're proposing it rather than they stated it, `suggested=true`. |
 | A school deadline, exam or term date | `key_dates` | `kind` in deadline, exam, term, event; `area_key='education'`; `course` like `MAT 2010`. |
@@ -71,8 +72,7 @@ Areas (`areas.key`): `education`, `mental`, `finances`, `health`, `work`, `relat
 - Mood and stress can be logged many times a day as timed entries; that's expected.
 - **Whole-day value:** one row per metric per day, `source='daily'`, `occurred_at` = **local noon** of that day (12:00 America/Detroit). If a daily row already exists for that metric and day, update it; don't add a second one.
 - **Timed value** (a mood right now, a workout at 6 PM): `source='app'` or `'claude'`, `occurred_at` = the actual time.
-- Apple Health writes `source='health'` through RPC `ingest_health`. Don't write those by hand.
-- The Ultrahuman ring writes `source='ring'` through `ingest_ring` (see Ring data). For the same metric and day, the ring's row replaces the Apple Health one, and Apple Health skips days the ring already filled. Don't write either by hand.
+- The Ultrahuman ring writes `source='ring'` through `ingest_ring` (see Ring data). Don't write those by hand. When the owner corrects ring sleep in the morning check-in, the app changes that row to `source='fixed'`, and `ingest_ring` leaves `fixed` rows alone. Apple Health is not used.
 - `value_num` for numbers, `value_text` for text metrics, `note` for context.
 
 ## Substances
@@ -88,7 +88,7 @@ Areas (`areas.key`): `education`, `mental`, `finances`, `health`, `work`, `relat
 
 ## Records
 
-- `name`, `category` (insurance, vehicle, taxes, identity, accounts, medical, housing, school, other), `issuer`, `details` (plan, policy or member number, what it covers), `location` (where the original is: "glove box", "Drive > Taxes > 2025"), `link` (https only; normally a Google Drive link), `login_hint` (username or account email, and which site; **never a password**), `expires_on` (date or null), `renews` (true for registrations and licenses), `notes`, `pinned`.
+- `name`, `category` (insurance, vehicle, taxes, identity, accounts, medical, housing, school, certs, other; `certs` is certifications), `issuer`, `details` (plan, policy or member number, what it covers), `location` (where the original is: "glove box", "Drive > Taxes > 2025"), `link` (https only; normally a Google Drive link), `login_hint` (username or account email, and which site; **never a password**), `expires_on` (date or null), `renews` (true for registrations and licenses), `notes`, `pinned`.
 - Only set `expires_on` when there is a real date. Records with no date never show as expired.
 - Files are not uploaded to the app. Link to them in Google Drive.
 
@@ -131,12 +131,15 @@ Each asset has one page in the app (Records, top of the page) that pulls togethe
 
 ## Check-ins and reviews
 
-- `checkins`: one per `(kind, day)`, kind morning or night; scales 1 to 10. Upsert on `(owner_id, kind, day)`.
+- `checkins`: one per `(kind, day)`, kind morning or night; scales 1 to 10. Upsert on `(owner_id, kind, day)`. A night check-in done before 4 AM belongs to the day before.
+- The app writes a plain summary of each check-in to `journal_entries` (title Morning/Night check-in, tag `check-in`, no AI) and keeps its id in `checkins.data.journal_id`. Clearing a check-in removes that entry too. Don't write these by hand.
 - `reviews`: one per `week_start` (Monday). Upsert on `(owner_id, week_start)`.
 
 ## Owner settings
 
-`profiles.settings.prefs` holds app preferences (theme, logo, bottom-bar tabs, Home time windows, calendar layers, `calRoles` mapping each Google calendar name to personal, work, classes, assignments or important (shown as "Time blocks"), `commute` {school, work} in minutes each way, and `pay` {rate, tips} per hour for the work pay estimate). Merge into it with `jsonb_set` / `||`; never overwrite the whole `settings` object.
+`profiles.settings.prefs` holds app preferences (theme, logo, bottom-bar tabs, Home time windows, calendar layers, `calRoles` mapping each Google calendar name to personal, work, classes, assignments or important (shown as "Time blocks"), `commute` {school, work} in minutes each way, and `pay` {rate, tips} per hour for the work pay estimate; Settings > About you edits these).
+
+`profiles.settings.money` drives the money card on Finances: `normalMonth` ($ a normal month costs, for runway), `payday` (one known payday; paydays repeat every 14 days), `liz` {amount, youOwe, note, asOf} (shared costs only; the Liz school-costs money is separate and not shown), `bills` [{name, amount, day, estimate}], `goals` [{key, name, target, saved, by, from}] (`from:'savings'` counts the savings accounts). Monarch stays the source of truth for balances; this holds only what Monarch doesn't. Merge, don't overwrite. Merge into it with `jsonb_set` / `||`; never overwrite the whole `settings` object.
 
 ## Backups
 

@@ -20,7 +20,7 @@ export type Prefs = {
   pay: { rate: number | null; tips: number | null }
 }
 export type CalRole = 'personal' | 'work' | 'classes' | 'assignments' | 'important'
-export type LogoKey = 'classic' | 'sunset' | 'night' | 'mono' | 'glass'
+export type LogoKey = 'classic' | 'rings' | 'bloom' | 'mono' | 'glass'
 
 export const DEFAULT_PREFS: Prefs = {
   windows: { morning: '04:30', log: '09:00', night: '20:00' },
@@ -36,6 +36,7 @@ export const DEFAULT_PREFS: Prefs = {
 
 const merge = (p: Partial<Prefs> | undefined): Prefs => ({
   ...DEFAULT_PREFS, ...p,
+  logo: ['classic', 'rings', 'bloom', 'mono', 'glass'].includes(p?.logo ?? '') ? p!.logo! : 'classic',
   windows: { ...DEFAULT_PREFS.windows, ...p?.windows },
   cal: { ...DEFAULT_PREFS.cal, ...p?.cal },
   calRoles: { ...p?.calRoles },
@@ -73,10 +74,12 @@ export function applyTheme(theme: Prefs['theme']) {
 }
 
 export const LOGOS: { key: LogoKey; name: string }[] = [
-  { key: 'classic', name: 'Classic' }, { key: 'sunset', name: 'Sunset' }, { key: 'night', name: 'Night' },
-  { key: 'mono', name: 'Black & white' }, { key: 'glass', name: 'Glass' },
+  { key: 'classic', name: 'Classic' }, { key: 'glass', name: 'Glass' }, { key: 'mono', name: 'Black & white' },
+  { key: 'rings', name: 'Rings' }, { key: 'bloom', name: 'Bloom' },
 ]
-export const logoUrl = (k: LogoKey, size: 180 | 512 = 180) => `${import.meta.env.BASE_URL}logos/${k}-${size}.png`
+/** Icons that were retired fall back to Classic. */
+const known = (k: string | undefined): LogoKey => (LOGOS.some((l) => l.key === k) ? k as LogoKey : 'classic')
+export const logoUrl = (k: LogoKey, size: 180 | 512 = 180) => `${import.meta.env.BASE_URL}logos/${known(k)}-${size}.png`
 
 /** iPhone reads the touch icon when you add the app to the Home Screen, so swap it ahead of time. */
 export function applyLogo(k: LogoKey) {

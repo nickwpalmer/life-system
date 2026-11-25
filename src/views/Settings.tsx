@@ -1,15 +1,18 @@
 import { useEffect, useState } from 'preact/hooks'
+import type { ComponentChildren } from 'preact'
 import { supabase, lockEnabled, setLockFlag } from '../lib/supabase'
-import { useStore, toast, getState } from '../lib/store'
+import { useStore, toast } from '../lib/store'
 import { saveMetric, saveArea, saveProfile, clearData } from '../lib/db'
 import { passkeySupported } from '../lib/lock'
 import { ROLE_LABEL } from '../lib/metrics'
 import type { Area, Metric, MetricKind, MetricRole } from '../lib/types'
 import { Icon } from '../ui/icons'
 import { Sheet, Switch, PageHead } from '../ui/kit'
-import { syncAll } from '../lib/sync'
+import { syncAll, syncRing, sourceTimes } from '../lib/sync'
 import { usePrefs, savePrefs, LOGOS, logoUrl } from '../lib/prefs'
-import { relTime, fmtShort, daysBetween, today, dayKey } from '../lib/dates'
+import { relTime, fmtShort, daysBetween, today } from '../lib/dates'
+
+export const VERSION = 'v0.5'
 import { NAV } from '../app'
 
 type Passkey = { id: string; friendly_name?: string; created_at: string; last_used_at?: string }
@@ -41,8 +44,7 @@ function Security() {
   }
 
   return (
-    <section class="card">
-      <div class="card-h"><h2>Face ID & security</h2></div>
+    <div class="conn-body">
       {!passkeySupported() && <p class="muted small">This browser can’t use passkeys.</p>}
       {keys?.map((k) => (
         <div class="row between" style="padding:8px 0;border-bottom:1px solid var(--line)">
@@ -50,13 +52,13 @@ function Security() {
           <button class="faint" onClick={() => remove(k.id)} aria-label="Remove"><Icon name="x" size={16} /></button>
         </div>
       ))}
-      <button class="btn block" style="margin-top:12px" onClick={add}><Icon name="face" size={20} /> Add Face ID on this device</button>
+      <button class="btn ghost sm" style="margin-top:10px" onClick={add}><Icon name="face" size={18} /> Add Face ID on this device</button>
       <div class="row between" style="margin-top:16px">
-        <span><div>Require Face ID to open</div><div class="faint small">Nothing that unlocks your data is saved on the device. Locks after 2 min away.</div></span>
+        <span><div>Require Face ID to open</div><div class="faint small">Locks after 5 minutes away. Nothing that unlocks your data is saved on the device.</div></span>
         <Switch label="Require Face ID" on={lock} onChange={toggleLock} />
       </div>
       {msg && <p class="err" style="margin-top:10px">{msg}</p>}
-    </section>
+    </div>
   )
 }
 
@@ -118,22 +120,44 @@ function Appearance() {
       <div class="field"><span>App icon</span>
         <div class="logos">{LOGOS.map((l) => <button class={p.logo === l.key ? 'on' : ''} onClick={() => savePrefs({ logo: l.key })} aria-label={l.name}><img src={logoUrl(l.key)} alt="" /><span>{l.name}</span></button>)}</div>
       </div>
-      <p class="faint small">To see a new icon on your Home Screen, remove Life from the Home Screen and add it again from Safari (Share, then Add to Home Screen). Your data stays put.</p>
+      <p class="faint small">A new icon shows on your Home Screen once you remove Life from it and add it again from Safari. Your data stays put.</p>
     </section>
   )
 }
 
-function Windows() {
+/** The facts about you that shape the app: your name, your day's rhythm, drive times and pay. */
+function AboutYou() {
   const p = usePrefs()
+  const profile = useStore((s) => s.profile)
+  const [name, setName] = useState(profile?.display_name ?? '')
   const set = (k: keyof typeof p.windows, v: string) => v && savePrefs({ windows: { ...p.windows, [k]: v } })
+  const n = (v: string) => v === '' ? null : Number(v)
   return (
     <section class="card">
-      <div class="card-h"><h2>Morning and night times</h2></div>
-      <p class="faint small" style="margin-bottom:10px">When Home offers the morning check-in, switches to your day, and offers the night check-in.</p>
-      <div class="row">
-        <label class="field grow"><span>Morning</span><input class="input" type="time" value={p.windows.morning} onChange={(e) => set('morning', (e.target as HTMLInputElement).value)} /></label>
-        <label class="field grow"><span>Day</span><input class="input" type="time" value={p.windows.log} onChange={(e) => set('log', (e.target as HTMLInputElement).value)} /></label>
-        <label class="field grow"><span>Night</span><input class="input" type="time" value={p.windows.night} onChange={(e) => set('night', (e.target as HTMLInputElement).value)} /></label>
+      <div class="card-h"><h2>About you</h2></div>
+      <label class="field"><span>Name</span>
+        <input class="input" value={name} onInput={(e) => setName((e.target as HTMLInputElement).value)} onBlur={() => name.trim() !== (profile?.display_name ?? '') && saveProfile({ display_name: name.trim() || undefined }).then(() => toast('Saved'))} />
+      </label>
+      <div class="field"><span>Your day</span>
+        <div class="row">
+          <label class="field grow mini"><span>Mornings from</span><input class="input" type="time" value={p.windows.morning} onChange={(e) => set('morning', (e.target as HTMLInputElement).value)} /></label>
+          <label class="field grow mini"><span>Day from</span><input class="input" type="time" value={p.windows.log} onChange={(e) => set('log', (e.target as HTMLInputElement).value)} /></label>
+          <label class="field grow mini"><span>Night from</span><input class="input" type="time" value={p.windows.night} onChange={(e) => set('night', (e.target as HTMLInputElement).value)} /></label>
+        </div>
+        <p class="faint tiny">When Home offers the morning check-in, your day, and the night check-in.</p>
+      </div>
+      <div class="field"><span>Drive time, each way</span>
+        <div class="row">
+          <label class="field grow mini"><span>To school (min)</span><input class="input" type="number" inputMode="numeric" value={p.commute.school || ''} onChange={(e) => savePrefs({ commute: { ...p.commute, school: n((e.target as HTMLInputElement).value) ?? 0 } })} /></label>
+          <label class="field grow mini"><span>To work (min)</span><input class="input" type="number" inputMode="numeric" value={p.commute.work || ''} onChange={(e) => savePrefs({ commute: { ...p.commute, work: n((e.target as HTMLInputElement).value) ?? 0 } })} /></label>
+        </div>
+        <p class="faint tiny">Added around class days and shifts when the calendar counts free time. Class and shift times come from your Google Calendar.</p>
+      </div>
+      <div class="field" style="margin-bottom:0"><span>Pay</span>
+        <div class="row">
+          <label class="field grow mini"><span>Hourly ($)</span><input class="input" type="number" inputMode="decimal" value={p.pay.rate ?? ''} onChange={(e) => savePrefs({ pay: { ...p.pay, rate: n((e.target as HTMLInputElement).value) } })} /></label>
+          <label class="field grow mini"><span>Tips per hour ($)</span><input class="input" type="number" inputMode="decimal" value={p.pay.tips ?? ''} onChange={(e) => savePrefs({ pay: { ...p.pay, tips: n((e.target as HTMLInputElement).value) } })} /></label>
+        </div>
       </div>
     </section>
   )
@@ -166,56 +190,71 @@ function TabPicker() {
   )
 }
 
-/** Drive times and pay, used by the calendar's Free time, School and Work views. */
-function TravelPay() {
-  const p = usePrefs()
-  const n = (v: string) => v === '' ? null : Number(v)
+type CState = 'ok' | 'warn' | 'off'
+/** One connection: a status dot, a line on how it's doing, and (tap) what you can do with it. */
+function Conn({ name, icon, sub, state, children }: { name: string; icon: string; sub: string; state: CState; children?: ComponentChildren }) {
+  const [open, setOpen] = useState(false)
   return (
-    <section class="card">
-      <div class="card-h"><h2>Travel and pay</h2></div>
-      <p class="faint small" style="margin-bottom:10px">Drive time each way gets added around class days and shifts when the calendar counts your free time. Nothing is added to Google Calendar.</p>
-      <div class="row">
-        <label class="field grow"><span>To school (min)</span><input class="input" type="number" inputMode="numeric" value={p.commute.school || ''} onChange={(e) => savePrefs({ commute: { ...p.commute, school: n((e.target as HTMLInputElement).value) ?? 0 } })} /></label>
-        <label class="field grow"><span>To work (min)</span><input class="input" type="number" inputMode="numeric" value={p.commute.work || ''} onChange={(e) => savePrefs({ commute: { ...p.commute, work: n((e.target as HTMLInputElement).value) ?? 0 } })} /></label>
-      </div>
-      <div class="row">
-        <label class="field grow"><span>Hourly rate ($)</span><input class="input" type="number" inputMode="decimal" value={p.pay.rate ?? ''} onChange={(e) => savePrefs({ pay: { ...p.pay, rate: n((e.target as HTMLInputElement).value) } })} /></label>
-        <label class="field grow"><span>Tips per hour ($)</span><input class="input" type="number" inputMode="decimal" value={p.pay.tips ?? ''} onChange={(e) => savePrefs({ pay: { ...p.pay, tips: n((e.target as HTMLInputElement).value) } })} /></label>
-      </div>
-    </section>
+    <div class={`conn-wrap ${open ? 'open' : ''}`}>
+      <button class="conn" onClick={() => children && setOpen(!open)} aria-expanded={open}>
+        <span class="m-ico"><Icon name={icon} size={18} /></span><span class="grow"><div>{name}</div><div class="faint tiny">{sub}</div></span>
+        <i class={`cstat ${state}`} aria-label={state === 'ok' ? 'Working' : state === 'warn' ? 'Behind' : 'Not set up'} />
+        {children && <span class={`g-chev ${open ? 'on' : ''}`}><Icon name="chev" size={15} /></span>}
+      </button>
+      {open && children}
+    </div>
   )
 }
 
 function Connections() {
   const synced = useStore((s) => s.synced_at)
   const demo = useStore((s) => s.demo)
-  const [st, setSt] = useState<{ monarch: string | null; health: string | null; key: boolean; ring: string | null } | null>(null)
-  useEffect(() => {
-    if (demo) { setSt({ monarch: new Date(Date.now() - 2 * 864e5).toISOString(), health: null, key: false, ring: dayKey(new Date(Date.now() - 864e5)) }); return }
-    Promise.all([
-      supabase.from('fin_accounts').select('as_of').order('as_of', { ascending: false }).limit(1),
-      supabase.from('ingest_keys').select('last_used_at').order('last_used_at', { ascending: false, nullsFirst: false }).limit(1),
-      supabase.from('ring_days').select('day').not('vals->sleep_hours', 'is', null).order('day', { ascending: false }).limit(1),
-    ]).then(([a, k, r]) => setSt({ monarch: (a.data?.[0] as { as_of?: string })?.as_of ?? null, health: (k.data?.[0] as { last_used_at?: string })?.last_used_at ?? null, key: !!k.data?.length, ring: (r.data?.[0] as { day?: string })?.day ?? null }))
-  }, [demo])
-  const ago = (iso: string | null) => (iso ? relTime(iso) : null)
-  const fresh = (iso: string | null, h: number) => !!iso && Date.now() - new Date(iso).getTime() < h * 3600e3
-  const rows: [string, string, string, 'ok' | 'warn' | 'off', string?][] = [
-    ['Google Calendar', 'cal', synced ? `Copied ${ago(synced)}, every 2 hours` : 'Not copied yet', synced ? (fresh(synced, 6) ? 'ok' : 'warn') : 'off'],
-    ['Monarch', 'money', st?.monarch ? `Balances from ${ago(st.monarch)}. Claude reads it when asked.` : 'No balances yet', st?.monarch ? (fresh(st.monarch, 24 * 8) ? 'ok' : 'warn') : 'off'],
-    ['Ultrahuman ring', 'pulse', st?.ring ? `Newest night: ${fmtShort(st.ring)}. Pulled morning and evening${daysBetween(st.ring, today()) > 2 ? '; open the Ultrahuman app so the ring syncs' : ''}.` : 'Not switched on yet. Tap for the steps.', st?.ring ? (daysBetween(st.ring, today()) <= 2 ? 'ok' : 'warn') : 'off', '#/help/health'],
-    ['Apple Health', 'heart', st?.health ? `Last sent ${ago(st.health)}` : st?.key ? 'Set up, nothing sent yet' : st?.ring ? 'Optional backup to the ring. Tap for the steps.' : 'Not set up yet. Tap for the steps.', st?.health ? (fresh(st.health, 36) ? 'ok' : 'warn') : 'off', '#/help/health'],
-    ['Claude', 'sparkle', 'Reads and writes your data, logs every change', 'ok', '#/changes'],
-    ['Supabase', 'lock', 'Your private database. Only you can read it.', 'ok'],
-    ['GitHub', 'link', 'Holds the app’s code (no personal data)', 'ok', 'https://github.com/nickwpalmer/life-system'],
-  ]
+  const email = useStore((s) => s.session?.user.email)
+  const [st, setSt] = useState<{ monarch: string | null; ringDay: string | null } | null>(null)
+  const [pw, setPw] = useState('')
+  const [pwOpen, setPwOpen] = useState(false)
+  const [ringBusy, setRingBusy] = useState(false)
+  const load = () => sourceTimes().then(setSt).catch(() => {})
+  useEffect(() => { load() }, [demo])
+  const fresh = (iso: string | null | undefined, h: number) => !!iso && Date.now() - new Date(iso).getTime() < h * 3600e3
+  async function changePw() {
+    if (pw.length < 10) { toast('Use at least 10 characters'); return }
+    const { error } = await supabase.auth.updateUser({ password: pw })
+    toast(error ? error.message : 'Password changed'); if (!error) { setPw(''); setPwOpen(false) }
+  }
+  async function ring() { setRingBusy(true); const [, line] = await syncRing().catch(() => ['fail', 'Couldn’t reach the ring sync'] as const); setRingBusy(false); toast(line); load() }
+  const behind = st?.ringDay ? daysBetween(st.ringDay, today()) : null
   return (
     <section class="card">
       <div class="card-h"><h2>Connections</h2></div>
-      {rows.map(([n, ic, sub, s, href]) => {
-        const inner = <><span class="m-ico"><Icon name={ic} size={18} /></span><span class="grow"><div>{n}</div><div class="faint tiny">{sub}</div></span><i class={`cstat ${s}`} aria-label={s === 'ok' ? 'Working' : s === 'warn' ? 'Behind' : 'Not set up'} /></>
-        return href ? <a class="conn" href={href} target={href.startsWith('http') ? '_blank' : undefined} rel="noopener">{inner}</a> : <div class="conn">{inner}</div>
-      })}
+      <Conn name="This app" icon="face" state="ok" sub={`Signed in as ${email ?? 'you'} · ${VERSION}`}>
+        <div class="conn-body">
+          <div class="row wrap" style="gap:8px">
+            <button class="btn ghost sm" onClick={() => syncAll()}><Icon name="history" size={16} />Sync now</button>
+            {!pwOpen && <button class="btn ghost sm" onClick={() => setPwOpen(true)}>Change password</button>}
+            <button class="btn ghost sm danger" onClick={async () => { await supabase.auth.signOut(); clearData() }}><Icon name="out" size={16} />Sign out</button>
+          </div>
+          {pwOpen && <div class="row" style="margin-top:10px"><input class="input grow" type="password" autocomplete="new-password" placeholder="New password" value={pw} onInput={(e) => setPw((e.target as HTMLInputElement).value)} /><button class="btn" onClick={changePw}>Save</button></div>}
+          <p class="faint tiny" style="margin-top:10px">Updates install themselves the next time you open the app. Built {new Date(__BUILD__).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}.</p>
+        </div>
+        <Security />
+      </Conn>
+      <Conn name="Google Calendar" icon="cal" state={synced ? (fresh(synced, 6) ? 'ok' : 'warn') : 'off'} sub={synced ? `Copied ${relTime(synced)}, every 2 hours` : 'Not copied yet'} />
+      <Conn name="Monarch" icon="money" state={st?.monarch ? (fresh(st.monarch, 24 * 8) ? 'ok' : 'warn') : 'off'} sub={st?.monarch ? `Balances from ${relTime(st.monarch)}. Claude copies them in.` : 'No balances yet'} />
+      <Conn name="Ultrahuman ring" icon="pulse" state={behind == null ? 'off' : behind <= 1 ? 'ok' : 'warn'}
+        sub={st?.ringDay ? `Newest night ${fmtShort(st.ringDay)}. Pulled morning and evening.` : 'No nights yet'}>
+        <div class="conn-body row wrap" style="gap:8px">
+          <button class={`btn ghost sm ${ringBusy ? 'busy' : ''}`} disabled={ringBusy} onClick={ring}><Icon name="history" size={16} />{ringBusy ? 'Syncing…' : 'Sync the ring'}</button>
+          <a class="btn ghost sm" href="#/help/ring">If it stops syncing</a>
+        </div>
+      </Conn>
+      <Conn name="Claude" icon="sparkle" state="ok" sub="Reads and writes your data, logs every change">
+        <div class="conn-body"><a class="btn ghost sm" href="#/changes">See and undo Claude’s changes</a></div>
+      </Conn>
+      <Conn name="Supabase" icon="lock" state="ok" sub="Your private database. Only you can read it." />
+      <Conn name="GitHub" icon="link" state="ok" sub="The app’s code and your encrypted weekly backup">
+        <div class="conn-body"><a class="btn ghost sm" href="https://github.com/nickwpalmer/life-system" target="_blank" rel="noopener">Open the code</a></div>
+      </Conn>
     </section>
   )
 }
@@ -223,49 +262,36 @@ function Connections() {
 export function Settings() {
   const metrics = useStore((s) => s.metrics)
   const areas = useStore((s) => s.areas)
-  const profile = useStore((s) => s.profile)
-  const [name, setName] = useState(profile?.display_name ?? '')
-  const [pw, setPw] = useState('')
-  const [pwOpen, setPwOpen] = useState(false)
   const [mEdit, setMEdit] = useState<{ open: boolean; m: Metric | null }>({ open: false, m: null })
   const [aEdit, setAEdit] = useState<{ open: boolean; a: Area | null }>({ open: false, a: null })
-
-  async function changePw() {
-    if (pw.length < 10) { toast('Use at least 10 characters'); return }
-    const { error } = await supabase.auth.updateUser({ password: pw })
-    toast(error ? error.message : 'Password changed'); if (!error) { setPw(''); setPwOpen(false) }
-  }
-
+  const [adv, setAdv] = useState(false)
   const [trackersOpen, setTrackersOpen] = useState(false)
   const on = metrics.filter((m) => m.active && m.role !== 'vice')
   return (
     <>
       <PageHead title="Settings" back="#/more" icon="gear" color="var(--muted)" />
-      <section class="card">
-        <div class="card-h"><h2>How this works</h2></div>
-        <p class="small" style="margin:-2px 0 12px;line-height:1.5">This app is just for you. Its code sits on <b>GitHub</b>, which also serves the app, with none of your data in it. Your data lives in your own private <b>Supabase</b> database that only you can open. <b>Claude</b> reads and writes it for you and logs every change, so you can undo any of it.</p>
-        <div class="row between" style="padding:8px 2px;border-top:1px solid var(--line)"><span class="muted">Signed in as</span><span class="small">{getState().session?.user.email}</span></div>
-        <label class="field" style="margin-top:6px"><span>Your name</span>
-          <input class="input" value={name} onInput={(e) => setName((e.target as HTMLInputElement).value)} onBlur={() => saveProfile({ display_name: name.trim() || undefined }).then(() => toast('Saved'))} />
-        </label>
-        <div class="row wrap" style="gap:8px">
-          <button class="btn ghost sm" onClick={() => syncAll()}><Icon name="history" size={16} />Sync now</button>
-          <a class="btn ghost sm" href="#/changes">Claude’s changes</a>
-          {!pwOpen && <button class="btn ghost sm" onClick={() => setPwOpen(true)}>Change password</button>}
-        </div>
-        {pwOpen && <div class="row" style="margin-top:10px"><input class="input grow" type="password" autocomplete="new-password" placeholder="New password" value={pw} onInput={(e) => setPw((e.target as HTMLInputElement).value)} /><button class="btn" onClick={changePw}>Save</button></div>}
-      </section>
-
+      <AboutYou />
       <Appearance />
       <TabPicker />
-      <Windows />
-      <TravelPay />
-      <Security />
+
+      <section class="card">
+        <div class="card-h"><h2>Areas of life</h2><button class="btn ghost sm" onClick={() => setAEdit({ open: true, a: null })}><Icon name="plus" size={16} />Add</button></div>
+        <p class="faint small" style="margin:-4px 0 6px">Your categories for tasks, goals and the calendar.</p>
+        {areas.map((a) => (
+          <button class="row between area-row" style={a.archived ? 'opacity:.45' : ''} onClick={() => setAEdit({ open: true, a })}>
+            <span class="row"><i class="dot" style={`background:${a.color};box-shadow:0 0 10px -2px ${a.color}`} />{a.name}</span><span class="faint"><Icon name="chev" size={16} /></span>
+          </button>
+        ))}
+      </section>
+
       <Connections />
 
-      <button class="card prompt" style="--accent:var(--violet);width:100%;text-align:left" onClick={() => setTrackersOpen(true)}>
-        <span class="orb"><Icon name="sliders" size={20} /></span><span class="grow"><h3>Trackers</h3><p class="muted small">{on.length} on · what the daily log and check-ins ask about</p></span><Icon name="chev" />
-      </button>
+      <a class="card prompt" href="#/help" style="--accent:var(--sky)"><span class="orb"><Icon name="help" size={20} /></span><span class="grow"><h3>Help</h3><p class="muted small">The ring, updates, undoing a check-in</p></span><Icon name="chev" /></a>
+
+      <button class="row between adv-toggle" onClick={() => setAdv(!adv)} aria-expanded={adv}><span class="faint small">Advanced</span><span class={`g-chev ${adv ? 'on' : ''}`}><Icon name="chev" size={15} /></span></button>
+      {adv && <button class="card prompt" style="--accent:var(--violet);width:100%;text-align:left" onClick={() => setTrackersOpen(true)}>
+        <span class="orb"><Icon name="sliders" size={20} /></span><span class="grow"><h3>Trackers</h3><p class="muted small">{on.length} on · what the daily log asks about</p></span><Icon name="chev" />
+      </button>}
       <Sheet open={trackersOpen} onClose={() => setTrackersOpen(false)} title="Trackers">
         <button class="btn ghost sm" style="margin-bottom:6px" onClick={() => setMEdit({ open: true, m: null })}><Icon name="plus" size={16} />Add a tracker</button>
         {(['habit', 'health', 'track'] as const).map((r) => (
@@ -280,20 +306,7 @@ export function Settings() {
           </div>
         ))}
       </Sheet>
-
-      <section class="card">
-        <div class="card-h"><h2>Areas of life</h2><button class="btn ghost sm" onClick={() => setAEdit({ open: true, a: null })}>Add</button></div>
-        <p class="faint small" style="margin:-4px 0 6px">Areas sort your tasks, goals, trackers and journal, and each gets its own page and color. Adding one gives you a new place to file things. Archiving one hides it from pickers and Home but keeps everything filed under it; nothing is deleted.</p>
-        {areas.map((a) => (
-          <div class="row between" style={`padding:10px 2px;border-bottom:1px solid var(--line);${a.archived ? 'opacity:.45' : ''}`} onClick={() => setAEdit({ open: true, a })}>
-            <span class="row"><i class="dot" style={`background:${a.color}`} />{a.name}</span><span class="faint"><Icon name="chev" size={16} /></span>
-          </div>
-        ))}
-      </section>
-
-      <a class="card prompt" href="#/help" style="--accent:var(--sky)"><span class="orb"><Icon name="help" size={20} /></span><span class="grow"><h3>Help</h3><p class="muted small">Apple Health setup, Mac, shortcuts, the icon</p></span><Icon name="chev" /></a>
-      <button class="btn ghost danger block" onClick={async () => { await supabase.auth.signOut(); clearData() }}><Icon name="out" size={18} /> Sign out</button>
-      <p class="faint small" style="text-align:center;margin-top:16px">Life v0.4</p>
+      <p class="faint small" style="text-align:center;margin-top:16px">Life {VERSION}</p>
 
       <MetricEditor open={mEdit.open} metric={mEdit.m} onClose={() => setMEdit({ open: false, m: null })} />
       <AreaEditor open={aEdit.open} area={aEdit.a} onClose={() => setAEdit({ open: false, a: null })} />

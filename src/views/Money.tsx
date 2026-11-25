@@ -1,8 +1,11 @@
 import { useEffect, useState } from 'preact/hooks'
 import { supabase } from '../lib/supabase'
-import { getState } from '../lib/store'
-import { fmtShort, daysUntil, today, relTime } from '../lib/dates'
-import { Card } from '../ui/kit'
+import { getState, useStore, toast } from '../lib/store'
+import { saveProfile } from '../lib/db'
+import { useRows } from '../lib/rows'
+import { fmtShort, daysUntil, today, relTime, dayKey, addDays, fromKey, daysBetween } from '../lib/dates'
+import { Card, Sheet } from '../ui/kit'
+import { Icon } from '../ui/icons'
 
 /** Money from Monarch: read once into fin_* tables (Claude refreshes them), shown here. Read-only. */
 type Acct = { ext_id: string; name: string; institution: string | null; type: string | null; balance: number | null; apr: number | null; min_payment: number | null; hidden: boolean; as_of: string }
@@ -57,6 +60,106 @@ export function useFin() {
   return fin
 }
 
+/** What the money card works from, kept on your profile (settings.money). Monarch stays the source of truth for balances. */
+type Goal = { key: string; name: string; target: number; saved?: number; by?: string | null; from?: 'savings' }
+type MoneySet = { normalMonth: number; payday: string; liz?: { amount: number; youOwe: boolean; note?: string; asOf?: string }; bills: { name: string; amount: number; day: number; estimate?: boolean }[]; goals: Goal[] }
+const DEMO_MONEY: MoneySet = { normalMonth: 1500, payday: dayKey(addDays(new Date(), -5)), liz: { amount: 40, youOwe: true }, bills: [{ name: 'Rent share', amount: 700, day: 3 }], goals: [{ key: 'emergency', name: 'Emergency fund', target: 8000, from: 'savings' }, { key: 'car', name: 'Car fund', target: 3000, saved: 400, by: '2027-08-31' }] }
+
+/** The next payday on a two-week cycle from a known one. */
+const nextPayday = (anchor: string) => { let d = fromKey(anchor); while (dayKey(d) <= today()) d = addDays(d, 14); return dayKey(d) }
+/** The next date a monthly bill on day N falls. */
+const nextOn = (day: number) => { const t = new Date(); const d = new Date(t.getFullYear(), t.getMonth(), day); if (dayKey(d) < today()) d.setMonth(d.getMonth() + 1); return dayKey(d) }
+type DocRow = { id: string; name: string; expires_on: string | null }
+
+/** Safe to spend until payday, months of runway, what's between you and Liz, the next money dates and three goals. */
+function MoneyCard({ fin }: { fin: Fin }) {
+  const demo = useStore((s) => s.demo)
+  const saved = useStore((s) => s.profile?.settings?.money as MoneySet | undefined)
+  const m = saved ?? (demo ? DEMO_MONEY : undefined)
+  const docs = useRows<DocRow>('records')
+  const [edit, setEdit] = useState(false)
+  const [why, setWhy] = useState(false)
+  if (!m) return null
+  const live = fin.accounts.filter((a) => !a.hidden && a.balance != null)
+  const sum = (re: RegExp) => live.filter((a) => re.test(a.type ?? '')).reduce((s, a) => s + (a.balance ?? 0), 0)
+  const checking = sum(/checking/i), savings = sum(/savings/i), cards = -sum(CARD)
+  const pay = nextPayday(m.payday)
+  const billsDue = m.bills.map((b) => ({ ...b, on: nextOn(b.day) })).filter((b) => b.on < pay)
+  const lizOwed = m.liz?.youOwe ? m.liz.amount : 0
+  const safe = checking - cards - billsDue.reduce((a, b) => a + b.amount, 0) - lizOwed
+  const runway = (checking + savings) / (m.normalMonth || 1)
+  const tone = runway >= 6 ? 'var(--mint)' : runway >= 3 ? 'var(--gold)' : 'var(--coral)'
+  const days = daysBetween(today(), pay)
+  const dates = [
+    { on: pay, label: 'Payday' },
+    ...m.bills.map((b) => ({ on: nextOn(b.day), label: b.name.replace(/ \(.*\)/, '') })),
+    ...(docs ?? []).filter((d) => d.expires_on && daysUntil(d.expires_on) >= 0 && daysUntil(d.expires_on) <= 60).map((d) => ({ on: d.expires_on!, label: `${d.name} ends` })),
+  ].sort((a, b) => a.on.localeCompare(b.on)).slice(0, 4)
+  return (
+    <section class="card money-card">
+      <button class="mc-top" onClick={() => setWhy(!why)} aria-expanded={why}>
+        <span class="faint small">Safe to spend until payday</span>
+        <b class="mc-big">{usd(Math.max(0, safe))}</b>
+        <span class="faint tiny">{days === 0 ? 'Payday is today' : `${days} day${days === 1 ? '' : 's'}, through ${fmtShort(pay)}`} · tap for how</span>
+      </button>
+      {why && <div class="mc-why small">
+        <div class="row between"><span>Checking</span><span>{usd(checking)}</span></div>
+        <div class="row between"><span>Card balances</span><span>−{usd(cards)}</span></div>
+        {billsDue.map((b) => <div class="row between"><span>{b.name}{b.estimate ? ' (about)' : ''}, {fmtShort(b.on)}</span><span>−{usd(b.amount)}</span></div>)}
+        {lizOwed > 0 && <div class="row between"><span>What you owe Liz</span><span>−{usd(lizOwed)}</span></div>}
+      </div>}
+      <div class="mc-row">
+        <div><b style={`color:${tone}`}>{runway.toFixed(1)}</b><span>months of runway</span></div>
+        {m.liz && <button onClick={() => setEdit(true)}><b>{m.liz.amount ? usd(m.liz.amount) : 'Even'}</b><span>{m.liz.amount ? (m.liz.youOwe ? 'you owe Liz' : 'Liz owes you') : 'with Liz'}</span></button>}
+      </div>
+      <div class="mc-dates">{dates.map((d) => <div class="row between small"><span>{d.label}</span><span class="faint">{fmtShort(d.on)}</span></div>)}</div>
+      <div class="mc-goals">
+        {m.goals.map((g) => {
+          const have = g.from === 'savings' ? savings : g.saved ?? 0
+          const p = Math.min(1, have / g.target)
+          return (
+            <button class="mc-goal" onClick={() => setEdit(true)}>
+              <div class="row between small"><span>{g.name}</span><span class="faint">{usd(have)} of {usd(g.target)}{g.by ? ` · by ${fmtShort(g.by)}` : ''}</span></div>
+              <div class="cat-bar"><i style={`width:${p * 100}%;${p >= 1 ? 'background:var(--mint)' : ''}`} /></div>
+            </button>
+          )
+        })}
+      </div>
+      <button class="faint tiny" style="margin-top:8px" onClick={() => setEdit(true)}><Icon name="edit" size={12} /> Edit these numbers</button>
+      <MoneyEdit open={edit} m={m} onClose={() => setEdit(false)} />
+    </section>
+  )
+}
+
+function MoneyEdit({ open, m, onClose }: { open: boolean; m: MoneySet; onClose: () => void }) {
+  const [f, setF] = useState<MoneySet>(m)
+  useEffect(() => { if (open) setF(JSON.parse(JSON.stringify(m))) }, [open])
+  const num = (v: string) => Number(v.replace(/[^0-9.]/g, '')) || 0
+  async function save() { onClose(); await saveProfile({ settings: { money: { ...f, liz: f.liz ? { ...f.liz, asOf: today() } : f.liz } } }).then(() => toast('Saved')).catch(() => {}) }
+  return (
+    <Sheet open={open} onClose={onClose} title="Money numbers">
+      <div class="row">
+        <label class="field grow"><span>A normal month costs</span><input class="input" inputMode="decimal" value={f.normalMonth} onInput={(e) => setF({ ...f, normalMonth: num((e.target as HTMLInputElement).value) })} /></label>
+        <label class="field grow"><span>A recent payday</span><input class="input" type="date" value={f.payday} onInput={(e) => setF({ ...f, payday: (e.target as HTMLInputElement).value || f.payday })} /></label>
+      </div>
+      {f.liz && <div class="field"><span>Shared costs with Liz</span>
+        <div class="row" style="gap:8px">
+          <input class="input" style="max-width:120px" inputMode="decimal" value={f.liz.amount} onInput={(e) => setF({ ...f, liz: { ...f.liz!, amount: num((e.target as HTMLInputElement).value) } })} />
+          <div class="seg grow"><button class={f.liz.youOwe ? 'on' : ''} onClick={() => setF({ ...f, liz: { ...f.liz!, youOwe: true } })}>You owe</button><button class={!f.liz.youOwe ? 'on' : ''} onClick={() => setF({ ...f, liz: { ...f.liz!, youOwe: false } })}>Liz owes</button></div>
+        </div>
+        {f.liz.note && <p class="faint tiny" style="margin-top:6px">{f.liz.note}</p>}
+      </div>}
+      {f.bills.map((b, i) => <div class="row">
+        <label class="field grow"><span>{b.name}</span><input class="input" inputMode="decimal" value={b.amount} onInput={(e) => { const bills = [...f.bills]; bills[i] = { ...b, amount: num((e.target as HTMLInputElement).value) }; setF({ ...f, bills }) }} /></label>
+        <label class="field" style="width:90px"><span>Day</span><input class="input" inputMode="numeric" value={b.day} onInput={(e) => { const bills = [...f.bills]; bills[i] = { ...b, day: Math.min(28, Math.max(1, num((e.target as HTMLInputElement).value))) }; setF({ ...f, bills }) }} /></label>
+      </div>)}
+      {f.goals.map((g, i) => <label class="field"><span>{g.name}: {g.from === 'savings' ? `goal (saved counts your savings accounts)` : 'saved so far'}</span>
+        <input class="input" inputMode="decimal" value={g.from === 'savings' ? g.target : g.saved ?? 0} onInput={(e) => { const goals = [...f.goals]; goals[i] = g.from === 'savings' ? { ...g, target: num((e.target as HTMLInputElement).value) } : { ...g, saved: num((e.target as HTMLInputElement).value) }; setF({ ...f, goals }) }} /></label>)}
+      <button class="btn primary block" onClick={save}>Save</button>
+    </Sheet>
+  )
+}
+
 export function MoneyPanel() {
   const fin = useFin()
   const [allTx, setAllTx] = useState(false)
@@ -91,6 +194,7 @@ export function MoneyPanel() {
   const tx = fin.tx.filter((t) => !(t.category === 'Interest' && Math.abs(t.amount) < 1)).slice(0, allTx ? 60 : 8)
 
   return <>
+    <MoneyCard fin={fin} />
     <div class="stat-row">
       <div class="stat" style="--c:var(--mint)"><div class="s-val">{usd(cash)}</div><div class="s-lbl">cash</div></div>
       <div class="stat" style="--c:var(--violet)"><div class="s-val">{usd(invested)}</div><div class="s-lbl">invested</div></div>

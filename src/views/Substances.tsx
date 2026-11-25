@@ -1,5 +1,5 @@
-import { useState } from 'preact/hooks'
-import { useRows, addRow, dropRow, registerDemo } from '../lib/rows'
+import { useEffect, useState } from 'preact/hooks'
+import { useRows, addRow, dropRow, patchRow, registerDemo } from '../lib/rows'
 import { toast, setState, useStore } from '../lib/store'
 import { dayKey, today, addDays, fmtDay, fmtTime, weekStart, lastNDays, fromKey } from '../lib/dates'
 import { Icon } from '../ui/icons'
@@ -47,53 +47,80 @@ function useNames(rows: Sub[] | null) {
 /** The display name a row belongs to. */
 const nameFor = (r: Sub, names: string[]) => names.find((n) => subKey(n) === subKey(r.substance)) ?? r.substance
 
-export function SubstanceSheet({ open, onClose, initial }: { open: boolean; onClose: () => void; initial?: string }) {
+/** Log a substance, or (with `edit`) change one you logged: what, how much, when, note. */
+export function SubstanceSheet({ open, onClose, initial, edit }: { open: boolean; onClose: () => void; initial?: string; edit?: Sub | null }) {
   const rows = useRows<Sub>('substance_logs')
   const names = useNames(rows)
-  const [name, setName] = useState(initial ?? '')
+  const [name, setName] = useState('')
+  const [fresh, setFresh] = useState(false)
   const [amount, setAmount] = useState('')
   const [unit, setUnit] = useState('')
   const [when, setWhen] = useState<'now' | 'earlier' | 'day'>('now')
+  const [date, setDate] = useState(today())
   const [time, setTime] = useState('')
   const [note, setNote] = useState('')
   const pick = (n: string) => {
-    setName(n)
+    if (n === '__new') { setFresh(true); setName(''); return }
+    setFresh(false); setName(n)
+    if (edit) return
     const last = rows?.find((r) => subKey(r.substance) === subKey(n))
     const st = STARTERS.find((s) => s.name === n)
     setAmount(String(last?.amount ?? st?.amount ?? 1)); setUnit(last?.unit ?? st?.unit ?? '')
   }
-  const reset = () => { setName(''); setAmount(''); setUnit(''); setWhen('now'); setTime(''); setNote('') }
+  useEffect(() => {
+    if (!open) return
+    if (edit) {
+      const d = new Date(edit.occurred_at)
+      setFresh(false); setName(nameFor(edit, names)); setAmount(edit.amount != null ? String(edit.amount) : ''); setUnit(edit.unit ?? '')
+      setWhen(edit.time_known ? 'earlier' : 'day'); setDate(dayKey(d)); setTime(`${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`); setNote(edit.note ?? '')
+    } else {
+      setFresh(false); setWhen('now'); setDate(today()); setTime(''); setNote('')
+      if (initial) pick(initial); else { setName(''); setAmount(''); setUnit('') }
+    }
+  }, [open, edit?.id])
   async function save() {
     // Reuse the name you've logged before, so "caffeine" and "Caffeine" stay one thing.
     const n = names.find((x) => subKey(x) === subKey(name)) ?? name.trim()
     if (!n) return
+    const [y, mo, dd] = date.split('-').map(Number)
     let at = new Date()
-    if (when === 'earlier' && time) { const [h, m] = time.split(':').map(Number); at = new Date(); at.setHours(h, m, 0, 0) }
-    if (when === 'day') { at = new Date(); at.setHours(12, 0, 0, 0) }
+    if (when === 'earlier' && time) { const [h, m] = time.split(':').map(Number); at = new Date(y, mo - 1, dd, h, m) }
+    if (when === 'day') at = new Date(y, mo - 1, dd, 12, 0)
     haptic()
+    const row = { substance: edit && subKey(edit.substance) === subKey(n) ? edit.substance : n, amount: amount ? Number(amount) : null, unit: unit.trim() || null, occurred_at: at.toISOString(), time_known: when !== 'day', note: note.trim() || null }
     try {
-      await addRow('substance_logs', { substance: n, amount: amount ? Number(amount) : null, unit: unit.trim() || null, occurred_at: at.toISOString(), time_known: when !== 'day', note: note.trim() || null, source: 'app' })
-      toast(`${n} logged${when === 'day' ? ' for today' : ` at ${fmtTime(at.toISOString())}`}`); reset(); onClose()
+      if (edit) { await patchRow('substance_logs', edit.id, row); toast('Updated') }
+      else { await addRow('substance_logs', { ...row, source: 'app' }); toast(`${n} logged${when === 'day' ? '' : ` at ${fmtTime(at.toISOString())}`}`) }
+      onClose()
     } catch { /* toast shown */ }
   }
+  async function del() { if (!edit) return; onClose(); await dropRow('substance_logs', edit.id).catch(() => {}); toast('Entry deleted') }
+  const listed = names.includes(name)
   return (
-    <Sheet open={open} onClose={() => { reset(); onClose() }} title="Log a substance">
-      <div class="chips" style="margin-bottom:14px">
-        {names.slice(0, 12).map((n) => <button class={`chip ${name === n ? 'on' : ''}`} style={`--c:${subColor(n, names)}`} onClick={() => pick(n)}>{n}</button>)}
-      </div>
-      <label class="field"><span>What</span><input class="input" placeholder="Anything non-food" value={name} onInput={(e) => setName((e.target as HTMLInputElement).value)} /></label>
+    <Sheet open={open} onClose={onClose} title={edit ? 'Edit entry' : 'Log a substance'}>
+      <label class="field"><span>What</span>
+        <select class="input" value={fresh || (!listed && name) ? '__new' : name} onChange={(e) => pick((e.target as HTMLSelectElement).value)}>
+          <option value="" disabled>Choose…</option>
+          {names.map((n) => <option value={n}>{n}</option>)}
+          <option value="__new">Something new…</option>
+        </select></label>
+      {(fresh || (!listed && name)) && <label class="field"><span>Name it</span><input class="input" autoFocus placeholder="Anything non-food" value={name} onInput={(e) => setName((e.target as HTMLInputElement).value)} /></label>}
       <div class="row">
         <label class="field grow"><span>Amount</span><input class="input" type="number" inputMode="decimal" value={amount} onInput={(e) => setAmount((e.target as HTMLInputElement).value)} /></label>
         <label class="field grow"><span>Unit</span><input class="input" placeholder="mg, cup, drink…" value={unit} onInput={(e) => setUnit((e.target as HTMLInputElement).value)} /></label>
       </div>
       <div class="field"><span>When</span><div class="chips">
-        <button class={`chip ${when === 'now' ? 'on' : ''}`} onClick={() => setWhen('now')}>Just now</button>
-        <button class={`chip ${when === 'earlier' ? 'on' : ''}`} onClick={() => setWhen('earlier')}>Earlier today</button>
-        <button class={`chip ${when === 'day' ? 'on' : ''}`} onClick={() => setWhen('day')}>Today, no time</button>
+        {!edit && <button class={`chip ${when === 'now' ? 'on' : ''}`} onClick={() => setWhen('now')}>Just now</button>}
+        <button class={`chip ${when === 'earlier' ? 'on' : ''}`} onClick={() => setWhen('earlier')}>{edit ? 'At a time' : 'Earlier'}</button>
+        <button class={`chip ${when === 'day' ? 'on' : ''}`} onClick={() => setWhen('day')}>No set time</button>
       </div></div>
-      {when === 'earlier' && <label class="field"><span>Time</span><input class="input" type="time" value={time} onInput={(e) => setTime((e.target as HTMLInputElement).value)} /></label>}
+      {when !== 'now' && <div class="row">
+        <label class="field grow"><span>Day</span><input class="input" type="date" max={today()} value={date} onInput={(e) => setDate((e.target as HTMLInputElement).value || today())} /></label>
+        {when === 'earlier' && <label class="field grow"><span>Time</span><input class="input" type="time" value={time} onInput={(e) => setTime((e.target as HTMLInputElement).value)} /></label>}
+      </div>}
       <label class="field"><span>Note (optional)</span><input class="input" value={note} onInput={(e) => setNote((e.target as HTMLInputElement).value)} /></label>
-      <button class="btn primary block" disabled={!name.trim()} onClick={save}>Log it</button>
+      <button class="btn primary block" disabled={!name.trim()} onClick={save}>{edit ? 'Save' : 'Log it'}</button>
+      {edit && <button class="btn ghost danger block" style="margin-top:8px" onClick={del}><Icon name="trash" size={18} /> Delete entry</button>}
     </Sheet>
   )
 }
@@ -150,19 +177,19 @@ export function Substances() {
   const [sel, setSel] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
   const [newest, setNewest] = useState(true)
+  const [editing, setEditing] = useState<Sub | null>(null)
   const choose = (n: string | null) => { setSel(n); window.scrollTo({ top: 0, behavior: 'smooth' }) }
   const wk = dayKey(weekStart())
   const countWeek = (n: string) => (rows ?? []).filter((r) => subKey(r.substance) === subKey(n) && dayKey(new Date(r.occurred_at)) >= wk).length
   const list = (rows ?? []).filter((r) => !sel || subKey(r.substance) === subKey(sel)).sort((a, b) => newest ? b.occurred_at.localeCompare(a.occurred_at) : a.occurred_at.localeCompare(b.occurred_at))
   const groups = new Map<string, Sub[]>()
   for (const r of list.slice(0, 200)) { const d = dayKey(new Date(r.occurred_at)); groups.set(d, [...(groups.get(d) ?? []), r]) }
-  const del = async (r: Sub) => { if (confirm(`Delete this ${r.substance} entry?`)) await dropRow('substance_logs', r.id).catch(() => {}) }
   return (
     <>
       <PageHead title="Substances" sub="Everything non-food, in order" icon="flask" color="var(--orange)" back="#/area/health"
         action={<button class="btn primary sm" onClick={() => setOpen(true)}><Icon name="plus" size={16} />Log</button>} />
       {rows === null ? <div class="skeleton" /> : !rows.length ? (
-        <div class="card soft"><p class="muted">Nothing logged yet. Tap Log, or use Substance in the quick log on Home. Coffee, a drink, a supplement or a med all go here.</p></div>
+        <div class="card soft"><p class="muted">Nothing logged yet. Tap Log, or the + button. Coffee, a drink, a supplement or a med all go here.</p></div>
       ) : (
         <>
           <div class="sub-pick">
@@ -175,12 +202,12 @@ export function Substances() {
               <div class="sublog">
                 <div class="faint small" style="margin:10px 2px 4px">{fmtDay(d)}</div>
                 {items.map((r) => (
-                  <div class="row subrow" onClick={() => choose(nameFor(r, names))}>
+                  <button class="row subrow" onClick={() => setEditing(r)}>
                     <i class="dot" style={`background:${subColor(nameFor(r, names), names)}`} />
                     <span class="grow" style="min-width:0"><b class="w5">{nameFor(r, names)}</b>{fmtAmt(r) && <span class="muted"> {fmtAmt(r)}</span>}{r.note && <div class="faint small">{r.note}</div>}</span>
-                    <span class="faint small">{r.time_known ? fmtTime(r.occurred_at) : d === today() ? 'Today' : ''}</span>
-                    <button class="faint" aria-label="Delete" onClick={(e) => { e.stopPropagation(); del(r) }}><Icon name="x" size={15} /></button>
-                  </div>
+                    <span class="faint small">{r.time_known ? fmtTime(r.occurred_at) : 'No time'}</span>
+                    <Icon name="chev" size={15} />
+                  </button>
                 ))}
               </div>
             ))}
@@ -188,6 +215,7 @@ export function Substances() {
         </>
       )}
       <SubstanceSheet open={open} onClose={() => setOpen(false)} initial={sel ?? undefined} />
+      <SubstanceSheet open={!!editing} edit={editing} onClose={() => setEditing(null)} />
     </>
   )
 }

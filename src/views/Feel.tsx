@@ -1,74 +1,95 @@
-import { useState } from 'preact/hooks'
-import { useStore, metricByKey, toast } from '../lib/store'
-import { addTimedLog, update } from '../lib/db'
+import { useEffect, useState } from 'preact/hooks'
+import { useStore, setState, metricByKey, toast } from '../lib/store'
+import { addTimedLog, remove, restore } from '../lib/db'
 import { fmtTime, today, dayKey } from '../lib/dates'
-import { haptic } from '../ui/kit'
+import { Sheet, ScalePicker, haptic } from '../ui/kit'
+import { Icon } from '../ui/icons'
 
 /**
- * "How are you right now?" in two taps, any time of day. Every tap is its own timed entry, so you can log
- * again ten minutes later. Change your mind within two minutes and it fixes the last one instead.
- *
- * Built on two well-used quick measures: a pleasantness scale like Apple Health's State of Mind (mood),
- * and a single stress item like the one used in workplace and student wellbeing research (stress / anxiety).
- * Both are stored on the 1 to 10 trackers mood and anxiety.
+ * "How are you right now?" Any time, as often as you like. Each answer is its own timed point
+ * on the 1 to 10 trackers mood, energy, anxiety (stress / anxiety) and focus, so the app can line
+ * them up against sleep, substances, classes and work. Answer one row or all four.
  */
-export const MOODS: [number, string, string][] = [[2, 'Rough', '#8fc4ff'], [4, 'Low', '#a98bff'], [6, 'Okay', '#cdb9ff'], [8, 'Good', '#ffc08a'], [10, 'Great', '#ffa463']]
-export const STRESS: [number, string, string][] = [[1, 'Calm', '#79e2b4'], [3, 'A little', '#b5e38a'], [5, 'Some', '#ffd66b'], [7, 'High', '#ffa463'], [9, 'Very high', '#ff8a7a']]
-const FIX_WINDOW = 2 * 60e3
+export const FEELS: { key: string; label: string; low: string; high: string; tone: 'warm' | 'cool' | 'rev' }[] = [
+  { key: 'mood', label: 'Mood', low: 'Rough', high: 'Great', tone: 'warm' },
+  { key: 'energy', label: 'Energy', low: 'Drained', high: 'Wired', tone: 'warm' },
+  { key: 'anxiety', label: 'Stress or anxiety', low: 'Calm', high: 'Very high', tone: 'rev' },
+  { key: 'focus', label: 'Focus', low: 'Scattered', high: 'Locked in', tone: 'cool' },
+]
+const WHEN: [string, number][] = [['Just now', 0], ['30 min ago', 30], ['1 hour ago', 60], ['2 hours ago', 120]]
 
-function useLast(key: string) {
-  const m = useStore((s) => s.metrics.find((x) => x.key === key))
-  return useStore((s) => m ? s.logs.filter((l) => l.metric_id === m.id && l.source !== 'daily' && l.value_num != null).sort((a, b) => b.occurred_at.localeCompare(a.occurred_at))[0] : undefined)
+/** Today's timed points, newest first, grouped by when they were logged. */
+function useTodayPoints() {
+  const ids = useStore((s) => s.metrics.filter((m) => FEELS.some((f) => f.key === m.key)).map((m) => [m.id, m.key] as const))
+  return useStore((s) => {
+    const byId = new Map(ids)
+    const pts = s.logs.filter((l) => byId.has(l.metric_id) && l.source !== 'daily' && l.value_num != null && dayKey(new Date(l.occurred_at)) === today())
+    const groups = new Map<string, typeof pts>()
+    for (const p of pts) groups.set(p.occurred_at.slice(0, 16), [...(groups.get(p.occurred_at.slice(0, 16)) ?? []), p])
+    return [...groups].sort((a, b) => b[0].localeCompare(a[0])).map(([, g]) => ({ at: g[0].occurred_at, items: g.map((l) => ({ ...l, key: byId.get(l.metric_id)! })) }))
+  })
 }
-const nameOf = (scale: [number, string, string][], v: number | null | undefined) => v == null ? '' : scale.reduce((best, s) => Math.abs(s[0] - v) < Math.abs(best[0] - v) ? s : best, scale[0])[1]
 
-export function Feel({ compact, onDone }: { compact?: boolean; onDone?: () => void }) {
-  const lastMood = useLast('mood')
-  const lastStress = useLast('anxiety')
-  const [step, setStep] = useState<'mood' | 'stress'>('mood')
-  const [picked, setPicked] = useState<{ mood?: number; stress?: number }>({})
-
-  async function log(key: 'mood' | 'anxiety', v: number) {
-    const m = metricByKey(key)
-    if (!m) { toast(`Turn on the ${key === 'mood' ? 'Mood' : 'Anxiety'} tracker in Settings first`); return false }
-    haptic()
-    const last = key === 'mood' ? lastMood : lastStress
+export function FeelSheet() {
+  const open = useStore((s) => s.feel)
+  const [vals, setVals] = useState<Record<string, number>>({})
+  const [ago, setAgo] = useState(0)
+  const [clock, setClock] = useState('')
+  const [note, setNote] = useState('')
+  const [busy, setBusy] = useState(false)
+  const points = useTodayPoints()
+  useEffect(() => { if (open) { setVals({}); setAgo(0); setClock(''); setNote('') } }, [open])
+  const close = () => setState({ feel: false })
+  const when = () => {
+    if (clock) { const [h, m] = clock.split(':').map(Number); const d = new Date(); d.setHours(h, m, 0, 0); return d }
+    return new Date(Date.now() - ago * 60e3)
+  }
+  async function save() {
+    const keys = Object.keys(vals)
+    if (!keys.length || busy) return
+    setBusy(true)
+    const at = when().toISOString()
     try {
-      if (last && Date.now() - new Date(last.occurred_at).getTime() < FIX_WINDOW) await update('logs', last.id, { value_num: v })
-      else await addTimedLog(m.id, v, null, null, new Date().toISOString())
-      return true
-    } catch { return false }
+      for (const [i, k] of keys.entries()) {
+        const m = metricByKey(k)
+        if (m) await addTimedLog(m.id, vals[k], null, i === 0 && note.trim() ? note.trim() : null, at)
+      }
+      haptic()
+      toast(`Logged for ${fmtTime(at)}`)
+      close()
+    } catch { /* shown */ } finally { setBusy(false) }
   }
-  async function pickMood(v: number) {
-    setPicked({ ...picked, mood: v })
-    if (await log('mood', v)) setStep('stress')
+  async function drop(g: { items: { id: string }[] }) {
+    const rows = g.items.map((i) => ({ ...i }))
+    for (const r of g.items) await remove('logs', r.id).catch(() => {})
+    toast('Removed', () => rows.forEach((r) => restore('logs', r as never)))
   }
-  async function pickStress(v: number) {
-    setPicked({ ...picked, stress: v })
-    if (await log('anxiety', v)) { toast(`Logged at ${fmtTime(new Date().toISOString())}`); setTimeout(() => { setStep('mood'); setPicked({}); onDone?.() }, 500) }
-  }
-
-  const lastAt = [lastMood, lastStress].filter(Boolean).map((l) => l!.occurred_at).sort().pop()
-  const lastLine = lastAt && dayKey(new Date(lastAt)) === today()
-    ? `Last logged ${fmtTime(lastAt)}${lastMood ? ` · ${nameOf(MOODS, lastMood.value_num)}` : ''}${lastStress ? ` · ${nameOf(STRESS, lastStress.value_num).toLowerCase()} stress` : ''}`
-    : 'Not logged yet today'
-  const scale = step === 'mood' ? MOODS : STRESS
-  const cur = step === 'mood' ? picked.mood : picked.stress
+  const n = Object.keys(vals).length
   return (
-    <div class={`feel ${compact ? 'compact' : ''}`}>
-      <div class="row between" style="margin-bottom:8px">
-        <span class="feel-q">{step === 'mood' ? 'How are you right now?' : 'Stress or anxiety?'}</span>
-        {step === 'stress'
-          ? <button class="faint small" onClick={() => { setStep('mood'); setPicked({}); toast('Mood logged'); onDone?.() }}>Skip</button>
-          : <span class="faint tiny">{lastLine}</span>}
-      </div>
-      <div class="moods" role="group" aria-label={step === 'mood' ? 'Mood' : 'Stress'} key={step}>
-        {scale.map(([v, l, c]) => (
-          <button class={`mood ${cur === v ? 'on' : ''}`} style={`--c:${c}`} onClick={() => step === 'mood' ? pickMood(v) : pickStress(v)} aria-pressed={cur === v}>
-            <i style={`--s:${0.55 + (step === 'mood' ? v : 10 - v) / 25}`} /><span>{l}</span>
-          </button>
+    <Sheet open={open} onClose={close} title="How are you right now?">
+      {FEELS.map((f) => (
+        <div class="feel-row">
+          <div class="row between"><span class="feel-l">{f.label}</span>{vals[f.key] != null && <button class="faint tiny" onClick={() => { const v = { ...vals }; delete v[f.key]; setVals(v) }}>Clear</button>}</div>
+          <ScalePicker value={vals[f.key] ?? null} low={f.low} high={f.high} tone={f.tone} onChange={(v) => setVals({ ...vals, [f.key]: v })} />
+        </div>
+      ))}
+      <div class="field"><span>When</span><div class="chips">
+        {WHEN.map(([l, m]) => <button class={`chip ${!clock && ago === m ? 'on' : ''}`} onClick={() => { setAgo(m); setClock('') }}>{l}</button>)}
+        <label class={`chip ${clock ? 'on' : ''}`} style="position:relative">{clock ? fmtTime(when().toISOString()) : 'Pick a time'}
+          <input type="time" class="chip-time" value={clock} onInput={(e) => setClock((e.target as HTMLInputElement).value)} /></label>
+      </div></div>
+      <label class="field"><span>Note <span class="faint">(optional)</span></span><input class="input" placeholder="What’s going on?" value={note} onInput={(e) => setNote((e.target as HTMLInputElement).value)} /></label>
+      <button class="btn primary block" disabled={!n || busy} onClick={save}>{n ? `Log ${n === 1 ? 'it' : `these ${n}`}` : 'Pick at least one'}</button>
+      {points.length > 0 && <div style="margin-top:18px">
+        <div class="faint tiny" style="margin-bottom:6px">Earlier today</div>
+        {points.map((g) => (
+          <div class="feel-pt">
+            <span class="faint small" style="width:64px">{fmtTime(g.at)}</span>
+            <span class="grow small">{g.items.map((i) => `${FEELS.find((f) => f.key === i.key)?.label.split(' ')[0]} ${i.value_num}`).join(' · ')}</span>
+            <button class="icon-btn sm" aria-label="Remove" onClick={() => drop(g)}><Icon name="x" size={15} /></button>
+          </div>
         ))}
-      </div>
-    </div>
+      </div>}
+    </Sheet>
   )
 }

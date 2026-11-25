@@ -17,8 +17,8 @@ export type Step = {
   auto?: boolean
 }
 
-export function Flow({ title, color, steps, onExit, onFinish, finishLabel = 'Done', start = 0 }: {
-  title: string; color: string; steps: Step[]; onExit: () => void; onFinish: (btn: Element | null) => void | Promise<void>; finishLabel?: string; start?: number
+export function Flow({ title, color, steps, onExit, onFinish, finishLabel = 'Done', start = 0, aside }: {
+  title: string; color: string; steps: Step[]; onExit: () => void; onFinish: (btn: Element | null) => void | Promise<void>; finishLabel?: string; start?: number; aside?: ComponentChildren
 }) {
   const [i, setI] = useState(start)
   const [dir, setDir] = useState<1 | -1>(1)
@@ -33,7 +33,8 @@ export function Flow({ title, color, steps, onExit, onFinish, finishLabel = 'Don
   return (
     <div class="flow" style={`--c:${color}`}>
       <div class="flow-top">
-        <span class="flow-title">{title}</span>
+        <span class="flow-title grow">{title}</span>
+        {aside}
         <button class="icon-btn" aria-label="Stop for now" onClick={onExit}><Icon name="x" size={20} /></button>
       </div>
       <div class="flow-bar">{steps.map((_, n) => <i class={n < i ? 'done' : n === i ? 'on' : ''} onClick={() => go(n)} />)}</div>

@@ -1,6 +1,6 @@
 import { useState } from 'preact/hooks'
 import { useStore } from '../lib/store'
-import { today, fmtLongDate, partOfDay, fmtTime, daysUntil, daysBetween, fmtDay, weekStart, dayKey, relTime, fromKey, fmtShort } from '../lib/dates'
+import { today, fmtLongDate, partOfDay, fmtTime, daysUntil, daysBetween, fmtDay, weekStart, dayKey, relTime, fromKey, fmtShort, checkinDay } from '../lib/dates'
 import { eventDay, calColor, nextBirthday } from '../lib/cal'
 import { usePrefs, phaseNow } from '../lib/prefs'
 import { Icon } from '../ui/icons'
@@ -30,7 +30,7 @@ function Hero() {
   const phase = force ?? phaseNow(prefs)
   const t = today()
   // The night check-in after midnight still belongs to yesterday.
-  const nightDay = new Date().getHours() < 12 ? dayKey(new Date(Date.now() - 864e5)) : t
+  const nightDay = checkinDay('night')
   const morningDone = !force && checkins.some((c) => c.kind === 'morning' && c.day === t)
   const nightDone = !force && checkins.some((c) => c.kind === 'night' && c.day === nightDay)
   if (phase === 'morning' && !morningDone) return (
@@ -55,7 +55,7 @@ function Rituals() {
   const checkins = useStore((s) => s.checkins)
   const reviews = useStore((s) => s.reviews)
   const t = today()
-  const nightDay = new Date().getHours() < 12 ? dayKey(new Date(Date.now() - 864e5)) : t
+  const nightDay = checkinDay('night')
   const ws = dayKey(weekStart())
   const lastWs = dayKey(weekStart(new Date(Date.now() - 7 * 864e5)))
   const items: [string, string, string, boolean, string][] = [
@@ -83,7 +83,7 @@ function Dash() {
   const week = Array.from({ length: 7 }, (_, i) => dayKey(new Date(Date.now() - (6 - i) * 864e5)))
   const avg = (k: string, d: string) => { const v = of(k).filter((l) => dayKey(new Date(l.occurred_at)) === d).map((l) => l.value_num!); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null }
   const mood = todayTimed('mood'), stress = todayTimed('anxiety')
-  // Sleep and steps come from the ring or Apple Health, which can lag a few days; show the newest one with its date.
+  // Sleep and steps come from the ring, which can lag a day; show the newest one with its date.
   const newest = (k: string) => { const l = of(k).sort((a, b) => b.occurred_at.localeCompare(a.occurred_at))[0]; return l ? { v: l.value_num!, d: dayKey(new Date(l.occurred_at)), src: l.source } : null }
   const yday = dayKey(new Date(Date.now() - 864e5))
   const sl = newest('sleep_hours'), st = newest('steps')
@@ -183,8 +183,6 @@ export function useGaps() {
   for (const r of recs ?? []) if (r.expires_on && daysUntil(r.expires_on) < 0 && daysUntil(r.expires_on) >= -90) out.push({ icon: 'layers', c: 'var(--danger)', href: '#/records', text: `${r.name} ${r.renews ? 'was due for renewal' : 'expired'} on ${fmtShort(r.expires_on)}.` })
   if (synced && Date.now() - new Date(synced).getTime() > 6 * 3600e3) out.push({ icon: 'cal', c: 'var(--sky)', href: '#/settings', text: `Google Calendar hasn’t synced since ${relTime(synced)}.` })
   else if (!synced && !events) out.push({ icon: 'cal', c: 'var(--sky)', href: '#/settings', text: 'Google Calendar hasn’t synced yet.' })
-  const health = logs.filter((l) => l.source === 'health').map((l) => l.occurred_at).sort().pop()
-  if (health && Date.now() - new Date(health).getTime() > 36 * 3600e3) out.push({ icon: 'heart', c: 'var(--mint)', href: '#/settings', text: `No Apple Health data since ${relTime(health)}. Check that your ring synced to Apple Health.` })
   const logged = logs.filter((l) => l.source === 'daily' || l.source === 'app').map((l) => dayKey(new Date(l.occurred_at))).filter((d) => d < t).sort().pop()
   if (logged && daysBetween(logged, t) > 2) out.push({ icon: 'sliders', c: 'var(--pink)', href: `#/log/${logged}`, text: `Nothing in your daily log since ${fmtDay(logged)}.` })
   const ci = checkins.map((c) => c.day).sort().pop()

@@ -6,7 +6,7 @@ import { bootstrap, clearData, installRefresh } from './lib/db'
 import { installIdleLock } from './lib/lock'
 import { today } from './lib/dates'
 import { Icon } from './ui/icons'
-import { Toast, Spinner } from './ui/kit'
+import { Toast, Spinner, haptic } from './ui/kit'
 import { AuthScreen } from './views/Auth'
 import { Today } from './views/Today'
 import { Tasks } from './views/Tasks'
@@ -15,7 +15,9 @@ import { Journal } from './views/Journal'
 import { Insights } from './views/Insights'
 import { More } from './views/More'
 import { Notes } from './views/Notes'
-import { Records } from './views/Records'
+import { Records, Things } from './views/Records'
+import { Reading } from './views/Reading'
+import { FeelSheet } from './views/Feel'
 import { AssetPage } from './views/Assets'
 import { Calendar } from './views/Calendar'
 import { Settings } from './views/Settings'
@@ -32,23 +34,70 @@ import { Help } from './views/Help'
 import { usePrefs, logoUrl, applyTheme, applyLogo } from './lib/prefs'
 import { syncAll } from './lib/sync'
 
-/** Pull down at the top of any screen to sync with the database. */
+/** Pull down at the top of any screen to sync. The panel shows each source as it checks in. */
 function PullToSync() {
   const [pull, setPull] = useState(0)
-  const [busy, setBusy] = useState(false)
   useEffect(() => {
     let y0: number | null = null, d = 0
-    const start = (e: TouchEvent) => { y0 = window.scrollY <= 0 && !document.querySelector('.sheet') ? e.touches[0].clientY : null; d = 0 }
+    const start = (e: TouchEvent) => { y0 = window.scrollY <= 0 && !document.querySelector('.sheet, .fan-back') ? e.touches[0].clientY : null; d = 0 }
     const move = (e: TouchEvent) => { if (y0 === null) return; d = Math.max(0, e.touches[0].clientY - y0); setPull(Math.min(d, 110)) }
-    const end = () => {
-      if (y0 !== null && d > 80) { setBusy(true); syncAll().finally(() => setBusy(false)) }
-      y0 = null; d = 0; setPull(0)
-    }
+    const end = () => { if (y0 !== null && d > 80) syncAll(); y0 = null; d = 0; setPull(0) }
     addEventListener('touchstart', start, { passive: true }); addEventListener('touchmove', move, { passive: true }); addEventListener('touchend', end)
     return () => { removeEventListener('touchstart', start); removeEventListener('touchmove', move); removeEventListener('touchend', end) }
   }, [])
-  if (!pull && !busy) return null
-  return <div class={`ptr ${busy || pull > 80 ? 'ready' : ''}`} style={`transform:translate(-50%, ${busy ? 18 : pull * 0.4}px)`}><Icon name="history" size={18} />{busy ? 'Syncing…' : pull > 80 ? 'Release to sync' : 'Pull to sync'}</div>
+  if (!pull) return null
+  return <div class={`ptr ${pull > 80 ? 'ready' : ''}`} style={`transform:translate(-50%, ${pull * 0.4}px)`}><Icon name="history" size={18} />{pull > 80 ? 'Release to sync' : 'Pull to sync'}</div>
+}
+
+/** What a sync touched, one dot per source, filling in as each answers. */
+function SyncPanel() {
+  const items = useStore((s) => s.sync)
+  if (!items) return null
+  const done = items.every((i) => i.state !== 'wait')
+  return (
+    <div class="sync-panel" role="status" onClick={() => setState({ sync: null })}>
+      <div class="row between" style="margin-bottom:6px"><b>{done ? 'Synced' : 'Syncing…'}</b><span class="faint tiny">{done ? 'Tap to close' : ''}</span></div>
+      {items.map((i) => (
+        <div class="sync-row"><i class={`sdot ${i.state}`} /><span class="grow"><span>{i.label}</span><span class="faint tiny">{i.detail}</span></span></div>
+      ))}
+    </div>
+  )
+}
+
+/** The + button. Tap: a fan of what you can log. On a computer, the sidebar button and N open capture directly. */
+const FAN: { k: string; icon: string; label: string; c: string; go: () => void }[] = [
+  { k: 'feel', icon: 'smile', label: 'Feeling', c: 'var(--pink)', go: () => setState({ feel: true }) },
+  { k: 'sub', icon: 'flask', label: 'Substance', c: 'var(--orange)', go: () => setState({ substance: true }) },
+  { k: 'task', icon: 'tasks', label: 'Task', c: 'var(--violet)', go: () => setState({ capture: 'task' }) },
+  { k: 'journal', icon: 'book', label: 'Journal', c: 'var(--mint)', go: () => setState({ capture: 'journal' }) },
+  { k: 'note', icon: 'note', label: 'Note or idea', c: 'var(--peach)', go: () => setState({ capture: 'note' }) },
+]
+function Fab() {
+  const [open, setOpen] = useState(false)
+  useEffect(() => {
+    if (!open) return
+    const f = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
+    addEventListener('keydown', f); return () => removeEventListener('keydown', f)
+  }, [open])
+  const n = FAN.length
+  return (
+    <>
+      {open && <div class="fan-back" onClick={() => setOpen(false)} />}
+      <div class={`fan ${open ? 'open' : ''}`} aria-hidden={!open}>
+        {FAN.map((f, i) => {
+          // A quarter circle up and to the left of the button.
+          const a = (Math.PI / 2) * (i / (n - 1)), r = 118
+          return (
+            <button class="fan-item" style={`--c:${f.c};--x:${-Math.round(Math.cos(a) * r)}px;--y:${-Math.round(Math.sin(a) * r)}px;--d:${i * 28}ms`} tabIndex={open ? 0 : -1}
+              onClick={() => { haptic(); setOpen(false); f.go() }} aria-label={f.label}>
+              <span class="fan-ico"><Icon name={f.icon} size={21} /></span><span class="fan-label">{f.label}</span>
+            </button>
+          )
+        })}
+      </div>
+      <button class={`fab ${open ? 'open' : ''}`} aria-label={open ? 'Close' : 'Log something'} aria-expanded={open} onClick={() => { haptic(); setOpen(!open) }}><Icon name="plus" size={26} stroke={2.4} /></button>
+    </>
+  )
 }
 
 function useRoute() {
@@ -63,6 +112,8 @@ function useRoute() {
 }
 
 const isDemo = /[?&]demo\b/.test(location.search)
+// Always open on Home. (Demo links keep their page, for checking a screen.)
+if (!isDemo && !/access_token|error_description/.test(location.hash)) history.replaceState(null, '', location.pathname + location.search + '#/today')
 
 // Everything you can go to. The bottom bar shows Home, three of these (you pick in Settings), and Everything.
 export type NavItem = { r: string; icon: string; label: string; c: string; group: 'main' | 'life' | 'plan' | 'ref' | 'system'; sub?: string }
@@ -76,11 +127,14 @@ export const NAV: NavItem[] = [
   { r: 'money', icon: 'money', label: 'Finances', c: 'var(--gold)', group: 'life', sub: 'Accounts, bills, spending' },
   { r: 'health', icon: 'heart', label: 'Health', c: 'var(--mint)', group: 'life', sub: 'Sleep, body, mind' },
   { r: 'substances', icon: 'flask', label: 'Substances', c: 'var(--orange)', group: 'life', sub: 'Everything non-food' },
+  { r: 'reading', icon: 'books', label: 'Reading', c: 'var(--sky)', group: 'life', sub: 'Books and where you are' },
   { r: 'goals', icon: 'target', label: 'Goals', c: 'var(--gold)', group: 'plan', sub: 'What you’re building' },
   { r: 'review', icon: 'review', label: 'Weekly review', c: 'var(--lilac)', group: 'plan', sub: 'Last week, next week' },
   { r: 'insights', icon: 'chart', label: 'Insights', c: 'var(--teal)', group: 'plan', sub: 'Patterns and reviews' },
   { r: 'people', icon: 'users', label: 'People', c: 'var(--coral)', group: 'ref', sub: 'Birthdays, keeping in touch' },
-  { r: 'records', icon: 'layers', label: 'Records', c: 'var(--peach)', group: 'ref', sub: 'Car, apartment, insurance, taxes' },
+  { r: 'records', icon: 'layers', label: 'Documents', c: 'var(--peach)', group: 'ref', sub: 'IDs, insurance, certifications' },
+  { r: 'things', icon: 'car', label: 'Your things', c: 'var(--sky)', group: 'ref', sub: 'Car, apartment, inventories' },
+  { r: 'notes', icon: 'note', label: 'Notes', c: 'var(--gold)', group: 'ref', sub: 'Lists, how-tos, ideas' },
   { r: 'changes', icon: 'history', label: 'Claude’s changes', c: 'var(--violet)', group: 'system', sub: 'See, undo, leave Claude a note' },
   { r: 'settings', icon: 'gear', label: 'Settings', c: 'var(--muted)', group: 'system', sub: 'Preferences and connections' },
   { r: 'help', icon: 'help', label: 'Help', c: 'var(--sky)', group: 'system', sub: 'How things work' },
@@ -205,6 +259,8 @@ export function App() {
     case 'more': view = <More />; break
     case 'notes': view = <Notes />; break
     case 'records': view = sub ? <AssetPage key={sub} ref_={sub} /> : <Records />; break
+    case 'things': view = <Things />; break
+    case 'reading': view = <Reading />; break
     case 'calendar': view = <Calendar mode={sub} />; break
     case 'settings': view = <Settings />; break
     case 'goals': view = <Goals />; break
@@ -223,12 +279,14 @@ export function App() {
         <Sidebar base={base} />
         <main class="app"><div class="view" key={path}>{view}</div></main>
       </div>
-      {base !== 'checkin' && <button class="fab" aria-label="Capture" onClick={() => setState({ capture: true })}><Icon name="plus" size={26} stroke={2.4} /></button>}
+      {base !== 'checkin' && <Fab />}
       <TabBar base={base} />
       <Capture />
       <GlobalSubstanceSheet />
+      <FeelSheet />
       <GlobalPersonSheet />
       <PullToSync />
+      <SyncPanel />
       <Toast />
     </>
   )

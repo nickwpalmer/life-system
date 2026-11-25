@@ -186,7 +186,7 @@ export function AddTask({ defaults, placeholder = 'Add a task' }: { defaults?: P
   )
 }
 
-type View = 'home' | 'inbox' | 'today' | 'upcoming' | 'someday' | 'done'
+type View = 'home' | 'lists' | 'inbox' | 'today' | 'upcoming' | 'someday' | 'done'
 
 /** Which class a task belongs to, from a tag like MAT-2010 or the course code in its title. */
 export function courseOf(t: Task): string | null {
@@ -249,7 +249,6 @@ function Overview({ go }: { go: (v: View) => void }) {
   const t0 = today()
   const live = tasks.filter((t) => openTask(t) && t.status !== 'inbox')
   const inbox = tasks.filter((t) => t.status === 'inbox').length
-  const lists = listTags(tasks)
   const cards = [...areas.filter((a) => !a.archived), { id: null, key: 'none', name: 'No area', color: 'var(--faint)' }].map((a) => {
     const mine = live.filter((t) => (t.area_id ?? null) === a.id)
     return { a, open: mine.length, late: mine.filter((t) => t.due_date && t.due_date < t0).length, today: mine.filter((t) => t.due_date === t0 || t.status === 'doing').length, week: mine.filter((t) => t.due_date && t.due_date > t0 && daysUntil(t.due_date) <= 7).length }
@@ -266,10 +265,28 @@ function Overview({ go }: { go: (v: View) => void }) {
           </a>
         ))}
       </div>
-      {lists.length > 0 && <>
-        <div class="group-h" style="margin:18px 4px 8px"><span>Lists</span><span class="faint">type #name to add</span></div>
-        <div class="chips">{lists.map(([g, n]) => <a class="chip" style="--c:var(--teal)" href={`#/tasks/list-${encodeURIComponent(g)}`}><Icon name="list" size={15} />{g}<span class="badge quiet" style="height:18px;min-width:18px;font-size:11px">{n}</span></a>)}</div>
-      </>}
+    </>
+  )
+}
+
+/** Lists (#shopping, #car…) as tiles, like the areas. */
+function ListTiles() {
+  const tasks = useStore((s) => s.tasks)
+  const lists = listTags(tasks)
+  const COL = ['var(--teal)', 'var(--sky)', 'var(--gold)', 'var(--pink)', 'var(--mint)', 'var(--peach)']
+  return (
+    <>
+      {lists.length ? <div class="atiles">{lists.map(([g, n], i) => {
+        const due = tasks.filter((t) => openTask(t) && t.tags?.includes(g) && t.due_date && t.due_date <= today()).length
+        return (
+          <a class="atile" href={`#/tasks/list-${encodeURIComponent(g)}`} style={`--c:${COL[i % COL.length]}`}>
+            <div class="a-name"><Icon name="list" size={14} /> {g}</div>
+            <div class="a-n">{n}<span> open</span></div>
+            <div class="a-meta">{due > 0 && <span class="pill">{due} due</span>}</div>
+          </a>
+        )
+      })}</div> : <div class="card soft"><p class="muted">No lists yet.</p></div>}
+      <p class="faint small" style="margin:4px 4px 0">Type #name when you add a task to start a list or add to one, like “milk #shopping”.</p>
     </>
   )
 }
@@ -290,7 +307,7 @@ function TagTasks({ tag }: { tag: string }) {
   const name = mine[0]?.tags?.find((g) => g.toLowerCase() === tag.toLowerCase()) ?? tag
   return (
     <>
-      <PageHead title={name} sub={`${mine.length} open`} back="#/tasks" icon="list" color="var(--teal)" />
+      <PageHead title={name} sub={`${mine.length} open`} back="#/tasks/lists" icon="list" color="var(--teal)" />
       <AddTask defaults={{ tags: [name], status: 'open' }} placeholder={`Add to ${name}…`} />
       <section class="card" style="--accent:var(--teal)">{mine.length ? mine.map((t) => <TaskRow t={t} onOpen={setEdit} />) : <p class="empty">Nothing on this list.</p>}</section>
       <TaskSheet task={edit} onClose={() => setEdit(null)} />
@@ -300,6 +317,7 @@ function TagTasks({ tag }: { tag: string }) {
 
 export function Tasks({ initial, areaKey }: { initial?: View; areaKey?: string }) {
   if (areaKey?.startsWith('list-')) return <TagTasks tag={decodeURIComponent(areaKey.slice(5))} />
+  if (areaKey === 'lists') return <TaskLists initial="lists" />
   if (areaKey) return <AreaTasks areaKey={areaKey} />
   return <TaskLists initial={initial} />
 }
@@ -319,9 +337,10 @@ function TaskLists({ initial }: { initial?: View }) {
   const nodate = active.filter((t) => !t.due_date && t.status !== 'doing').sort(sort === 'due' ? sortTasks('priority') : byDue)
   const row = (t: Task) => <TaskRow t={t} onOpen={setEdit} process={view === 'inbox'} />
 
-  const tabs: [View, string, number?][] = [['home', 'Overview'], ['inbox', 'Inbox', inboxN], ['today', 'Today', todayList.length], ['upcoming', 'Upcoming'], ['someday', 'Someday'], ['done', 'Done']]
+  const tabs: [View, string, number?][] = [['home', 'Areas'], ['lists', 'Lists'], ['inbox', 'Inbox', inboxN], ['today', 'Today', todayList.length], ['upcoming', 'Upcoming'], ['someday', 'Someday'], ['done', 'Done']]
   let body
   if (view === 'home') body = <Overview go={setView} />
+  else if (view === 'lists') body = <ListTiles />
   else if (view === 'inbox') {
     const inbox = open.filter((t) => t.status === 'inbox').sort(sort === 'due' ? sortTasks('oldest') : byDue)
     body = <section class="card">
@@ -354,7 +373,7 @@ function TaskLists({ initial }: { initial?: View }) {
       <div class="chips scroll grow" style="margin:0">
         {tabs.map(([v, l, n]) => <button class={`chip ${view === v ? 'on' : ''}`} onClick={() => setView(v)}>{l}{n ? <span class={`badge ${v === 'inbox' ? '' : 'quiet'}`} style="height:18px;min-width:18px;font-size:11px">{n}</span> : null}</button>)}
       </div>
-      {view !== 'home' && view !== 'upcoming' && view !== 'done' && <SortBtn value={sort} options={TASK_SORTS} onChange={setSort} />}
+      {view !== 'home' && view !== 'lists' && view !== 'upcoming' && view !== 'done' && <SortBtn value={sort} options={TASK_SORTS} onChange={setSort} />}
       </div>
       {body}
       <TaskSheet task={edit} onClose={() => setEdit(null)} />

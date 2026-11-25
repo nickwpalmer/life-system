@@ -7,14 +7,19 @@ import { setState } from './store'
  * dropping tokens from memory too. Unlocking = a passkey sign-in, which the server
  * verifies; on iPhone the passkey prompt is Face ID.
  */
-const IDLE_MS = 2 * 60 * 1000
+export const IDLE_MS = 5 * 60 * 1000
 let hiddenAt = 0
 
+/** Coming back after 5+ minutes away: lock (if Face ID is on), go Home, and pick up any new version of the app. */
 export function installIdleLock() {
   document.addEventListener('visibilitychange', async () => {
-    if (!lockEnabled()) return
     if (document.visibilityState === 'hidden') { hiddenAt = Date.now(); return }
-    if (hiddenAt && Date.now() - hiddenAt > IDLE_MS) await lockNow()
+    const away = hiddenAt && Date.now() - hiddenAt > IDLE_MS
+    hiddenAt = 0
+    if (!away) return
+    if (!document.querySelector('.sheet textarea, .sheet input:focus')) location.hash = '#/today'
+    navigator.serviceWorker?.getRegistration().then((r) => r?.update()).catch(() => {})
+    if (lockEnabled()) await lockNow()
   })
 }
 

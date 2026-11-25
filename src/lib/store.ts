@@ -24,6 +24,10 @@ type State = Data & {
   substance: boolean
   /** Person sheet: the id of the person to show, from anywhere their name appears. */
   person: string | 'new' | null
+  /** The sync panel's rows while a sync is showing, or null. */
+  sync: import('./sync').SyncItem[] | null
+  /** How-you-feel sheet. */
+  feel: boolean
 }
 
 export const emptyData = (): Data => ({
@@ -31,7 +35,7 @@ export const emptyData = (): Data => ({
   goals: [], people: [], reviews: [], events: [], synced_at: null,
 })
 
-let state: State = { ...emptyData(), session: null, ready: false, loaded: false, locked: false, demo: false, toast: null, capture: false, substance: false, person: null }
+let state: State = { ...emptyData(), session: null, ready: false, loaded: false, locked: false, demo: false, toast: null, capture: false, substance: false, person: null, sync: null, feel: false }
 const subs = new Set<() => void>()
 let queued = false
 

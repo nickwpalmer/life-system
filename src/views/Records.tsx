@@ -1,9 +1,9 @@
+import { Inventories } from './Inventory'
+import { AssetsStrip } from './Assets'
 import { useEffect, useState } from 'preact/hooks'
 import { useRows, addRow, patchRow, dropRow, registerDemo } from '../lib/rows'
 import { toast } from '../lib/store'
 import { daysUntil, fmtShort, fromKey, inDays } from '../lib/dates'
-import { Inventories } from './Inventory'
-import { AssetsStrip } from './Assets'
 import { Icon } from '../ui/icons'
 import { Sheet, PageHead, Switch, haptic } from '../ui/kit'
 
@@ -27,6 +27,7 @@ export const CATS: { k: string; label: string; icon: string; c: string }[] = [
   { k: 'accounts', label: 'Accounts', icon: 'lock', c: 'var(--violet)' },
   { k: 'medical', label: 'Medical', icon: 'pulse', c: 'var(--pink)' },
   { k: 'housing', label: 'Housing', icon: 'home', c: 'var(--peach)' },
+  { k: 'certs', label: 'Certifications', icon: 'degree', c: 'var(--teal)' },
   { k: 'school', label: 'School', icon: 'school', c: 'var(--lilac)' },
   { k: 'other', label: 'Other', icon: 'note', c: 'var(--muted)' },
 ]
@@ -157,14 +158,13 @@ export function Records() {
   const attention = (rows ?? []).filter((r) => expState(r) === 'expired' || expState(r) === 'soon').length
   return (
     <>
-      <PageHead title="Records" sub={attention ? `${attention} need${attention === 1 ? 's' : ''} a look` : 'Documents and the facts you need fast'} back="#/more" icon="layers" color="var(--peach)"
+      <PageHead title="Documents" sub={attention ? `${attention} need${attention === 1 ? 's' : ''} a look` : 'IDs, insurance, certifications, the facts you need fast'} back="#/more" icon="layers" color="var(--peach)"
         action={<button class="btn primary sm" onClick={() => setEdit(blank())}><Icon name="plus" size={16} />Add</button>} />
-      <AssetsStrip />
       {rows === null ? <div class="skeleton" /> : !rows.length ? (
         <div class="card soft"><p class="muted">Add the things you’d hate to dig for: insurance, car registration, tax returns, W-2s, your lease. Say where each original lives, and add the expiry date if it has one.</p></div>
       ) : (
         <>
-          <input class="input" style="margin-bottom:12px;border-radius:999px" placeholder="Search records" value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
+          <input class="input" style="margin-bottom:12px;border-radius:999px" placeholder="Search documents" value={q} onInput={(e) => setQ((e.target as HTMLInputElement).value)} />
           {used.length > 1 && <div class="chips scroll" style="margin-bottom:14px">
             <button class={`chip ${!cat ? 'on' : ''}`} onClick={() => setCat(null)}>All</button>
             {used.map((c) => <button class={`chip ${cat === c.k ? 'on' : ''}`} style={`--c:${c.c}`} onClick={() => setCat(cat === c.k ? null : c.k)}>{c.label}</button>)}
@@ -172,9 +172,19 @@ export function Records() {
           {list.length ? <div class="rec-grid">{list.map((r) => <RecCard r={r} onOpen={() => setEdit(r)} />)}</div> : <div class="card"><p class="empty">Nothing matches.</p></div>}
         </>
       )}
-      <Inventories />
-      <a class="card prompt" href="#/notes" style="--accent:var(--peach);margin-top:14px"><span class="orb"><Icon name="note" size={20} /></span><span class="grow"><h3>Notes</h3><p class="muted small">Lists, how-tos and anything else to keep</p></span><Icon name="chev" /></a>
       <RecordEditor rec={edit} onClose={() => setEdit(null)} />
+    </>
+  )
+}
+
+/** Your things: the car, the apartment and anything else you own, plus inventories. */
+export function Things() {
+  return (
+    <>
+      <PageHead title="Your things" sub="Car, apartment and what you own" back="#/more" icon="car" color="var(--sky)" />
+      <AssetsStrip />
+      <div style="height:14px" />
+      <Inventories />
     </>
   )
 }
