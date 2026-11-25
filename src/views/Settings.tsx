@@ -195,7 +195,7 @@ function Connections() {
     Promise.all([
       supabase.from('fin_accounts').select('as_of').order('as_of', { ascending: false }).limit(1),
       supabase.from('ingest_keys').select('last_used_at').order('last_used_at', { ascending: false, nullsFirst: false }).limit(1),
-      supabase.from('ring_days').select('day').order('day', { ascending: false }).limit(1),
+      supabase.from('ring_days').select('day').not('vals->sleep_hours', 'is', null).order('day', { ascending: false }).limit(1),
     ]).then(([a, k, r]) => setSt({ monarch: (a.data?.[0] as { as_of?: string })?.as_of ?? null, health: (k.data?.[0] as { last_used_at?: string })?.last_used_at ?? null, key: !!k.data?.length, ring: (r.data?.[0] as { day?: string })?.day ?? null }))
   }, [demo])
   const ago = (iso: string | null) => (iso ? relTime(iso) : null)

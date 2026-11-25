@@ -27,7 +27,8 @@ export function RingPanel() {
     </Card>
   )
   const byDay = new Map(rows.map((r) => [r.day, r.vals]))
-  const latest = rows[0]!
+  // The newest row with a night's sleep; a day that's only begun carries little else.
+  const latest = rows.find((r) => r.vals.sleep_hours != null) ?? rows[0]!
   const v = latest.vals
   const days = lastNDays(30)
   const s = (k: keyof V) => days.map((d) => byDay.get(d)?.[k] ?? null)
