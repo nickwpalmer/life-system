@@ -86,7 +86,7 @@ function Fab() {
       <div class={`fan ${open ? 'open' : ''}`} aria-hidden={!open}>
         {FAN.map((f, i) => {
           // A quarter circle up and to the left of the button.
-          const a = (Math.PI / 2) * (i / (n - 1)), r = 118
+          const a = (Math.PI / 2) * (i / (n - 1)), r = 172
           return (
             <button class="fan-item" style={`--c:${f.c};--x:${-Math.round(Math.cos(a) * r)}px;--y:${-Math.round(Math.sin(a) * r)}px;--d:${i * 28}ms`} tabIndex={open ? 0 : -1}
               onClick={() => { haptic(); setOpen(false); f.go() }} aria-label={f.label}>
