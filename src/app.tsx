@@ -65,7 +65,7 @@ function useRoute() {
 const isDemo = /[?&]demo\b/.test(location.search)
 
 // Everything you can go to. The bottom bar shows Home, three of these (you pick in Settings), and Everything.
-export type NavItem = { r: string; icon: string; label: string; c: string; group: 'main' | 'life' | 'system'; sub?: string }
+export type NavItem = { r: string; icon: string; label: string; c: string; group: 'main' | 'life' | 'plan' | 'ref' | 'system'; sub?: string }
 export const NAV: NavItem[] = [
   { r: 'today', icon: 'home', label: 'Home', c: 'var(--orange)', group: 'main' },
   { r: 'tasks', icon: 'tasks', label: 'Tasks', c: 'var(--violet)', group: 'main', sub: 'Capture, sort, do' },
@@ -76,11 +76,11 @@ export const NAV: NavItem[] = [
   { r: 'money', icon: 'money', label: 'Finances', c: 'var(--gold)', group: 'life', sub: 'Accounts, bills, spending' },
   { r: 'health', icon: 'heart', label: 'Health', c: 'var(--mint)', group: 'life', sub: 'Sleep, body, mind' },
   { r: 'substances', icon: 'flask', label: 'Substances', c: 'var(--orange)', group: 'life', sub: 'Everything non-food' },
-  { r: 'goals', icon: 'target', label: 'Goals', c: 'var(--gold)', group: 'life', sub: 'What you’re building' },
-  { r: 'review', icon: 'review', label: 'Weekly review', c: 'var(--lilac)', group: 'life', sub: 'Last week, next week' },
-  { r: 'insights', icon: 'chart', label: 'Insights', c: 'var(--teal)', group: 'life', sub: 'Patterns and reviews' },
-  { r: 'people', icon: 'users', label: 'People', c: 'var(--coral)', group: 'life', sub: 'Birthdays, keeping in touch' },
-  { r: 'records', icon: 'layers', label: 'Records', c: 'var(--peach)', group: 'life', sub: 'Car, apartment, insurance, taxes' },
+  { r: 'goals', icon: 'target', label: 'Goals', c: 'var(--gold)', group: 'plan', sub: 'What you’re building' },
+  { r: 'review', icon: 'review', label: 'Weekly review', c: 'var(--lilac)', group: 'plan', sub: 'Last week, next week' },
+  { r: 'insights', icon: 'chart', label: 'Insights', c: 'var(--teal)', group: 'plan', sub: 'Patterns and reviews' },
+  { r: 'people', icon: 'users', label: 'People', c: 'var(--coral)', group: 'ref', sub: 'Birthdays, keeping in touch' },
+  { r: 'records', icon: 'layers', label: 'Records', c: 'var(--peach)', group: 'ref', sub: 'Car, apartment, insurance, taxes' },
   { r: 'changes', icon: 'history', label: 'Claude’s changes', c: 'var(--violet)', group: 'system', sub: 'See, undo, leave Claude a note' },
   { r: 'settings', icon: 'gear', label: 'Settings', c: 'var(--muted)', group: 'system', sub: 'Preferences and connections' },
   { r: 'help', icon: 'help', label: 'Help', c: 'var(--sky)', group: 'system', sub: 'How things work' },
@@ -100,8 +100,12 @@ function Sidebar({ base }: { base: string }) {
       <a class="brand" href="#/today"><img src={logoUrl(usePrefs().logo)} alt="" />Life</a>
       <button class="btn primary new" onClick={() => setState({ capture: true })}><Icon name="plus" size={18} /> Capture <span class="tiny" style="opacity:.6">N</span></button>
       {NAV.filter((n) => n.group === 'main').map(a)}
-      <div class="s-label">Life</div>
+      <div class="s-label">Areas</div>
       {NAV.filter((n) => n.group === 'life').map(a)}
+      <div class="s-label">Plan and look back</div>
+      {NAV.filter((n) => n.group === 'plan').map(a)}
+      <div class="s-label">Reference</div>
+      {NAV.filter((n) => n.group === 'ref').map(a)}
       <div style="height:10px" />
       {NAV.filter((n) => n.group === 'system').map(a)}
       <div class="s-foot">Press N to capture · 1–7 to switch</div>

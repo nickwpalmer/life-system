@@ -9,7 +9,7 @@ export function More() {
   const row = (href: string, icon: string, label: string, sub: string | undefined, c: string, badge?: string) => (
     <a href={href}><span class="m-ico" style={`--c:${c}`}><Icon name={icon} /></span><span class="grow"><div>{label}</div>{sub && <div class="faint tiny">{sub}</div>}</span>{badge && <span class="pill" style="--c:var(--gold)">{badge}</span>}<span class="chev"><Icon name="chev" size={18} /></span></a>
   )
-  const group = (g: 'main' | 'life' | 'system', title: string) => (
+  const group = (g: 'main' | 'life' | 'plan' | 'ref' | 'system', title: string) => (
     <section class="card">
       <div class="card-h"><h2>{title}</h2></div>
       <div class="menu">{NAV.filter((n) => n.group === g && n.r !== 'today').map((n) => row(`#/${n.r}`, n.icon, n.label, n.sub, n.c, n.r === 'goals' && suggested ? `${suggested} new` : undefined))}</div>
@@ -25,7 +25,9 @@ export function More() {
         </div>
       </section>
       {group('main', 'Every day')}
-      {group('life', 'Your life')}
+      {group('life', 'Areas of your life')}
+      {group('plan', 'Plan and look back')}
+      {group('ref', 'Reference')}
       {group('system', 'The app')}
     </>
   )
