@@ -61,10 +61,13 @@ Areas (`areas.key`): `education`, `mental`, `finances`, `health`, `work`, `relat
 - `due_date` (date) and optional `due_time` (local time). `scheduled_for` = the day they plan to do it.
 - `goal_id` links a task to a goal (goal steps are tasks). `parent_id` makes a subtask.
 - `source`: `app` (typed in the app), `claude` (you), `ticktick` (one-time import, read-only history).
+- `recurrence`: `daily`, `weekdays`, `weekly`, `biweekly`, `monthly`, `yearly`, or null. When a repeating task is marked done, the app keeps that row as done and adds an open copy with the next `due_date` and `external_id = 'repeat-of:<done row id>'`. To make something repeat, set `recurrence` and a `due_date` on one open row; don't pre-create future copies.
+- Lists are tags (`Shopping`, `car`, `WSU`). Class codes like `MAT-2010` group school work by class. Don't add `Personal`; the area covers it. TickTick is being retired: the app is the only task list, so add tasks here, never in TickTick.
+- Steps of a bigger task are tasks with `parent_id`; the app shows them inside the parent. Short checklists can stay in `notes` as `- [ ]` lines.
 
 ## Logs (daily numbers)
 
-- Each tracked thing is a row in `metrics` (look it up by `key`): mood, anxiety (shown as "Stress / anxiety"), energy (scale 1 to 10), sleep_hours (h), sleep_score, hrv (ms), resting_hr (bpm), steps, exercise, meditation, study, reading (min), water (glasses), spend ($). The owner can add more. Metrics with `active=false` are off; don't log to them.
+- Each tracked thing is a row in `metrics` (look it up by `key`): mood, anxiety (shown as "Stress / anxiety"), energy, focus (scale 1 to 10; focus comes from the night check-in), sleep_hours (h), sleep_score, hrv (ms), resting_hr (bpm), steps, exercise, meditation, study, reading (min), water (glasses), spend ($). The owner can add more. Metrics with `active=false` are off; don't log to them.
 - Mood and stress can be logged many times a day as timed entries; that's expected.
 - **Whole-day value:** one row per metric per day, `source='daily'`, `occurred_at` = **local noon** of that day (12:00 America/Detroit). If a daily row already exists for that metric and day, update it; don't add a second one.
 - **Timed value** (a mood right now, a workout at 6 PM): `source='app'` or `'claude'`, `occurred_at` = the actual time.

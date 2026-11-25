@@ -8,6 +8,7 @@ import { supabase } from './supabase'
 import { getState, setState, toast, emptyData, type Data } from './store'
 import type { Checkin, Log, Metric, Task } from './types'
 import { addDays, dayKey, fromKey } from './dates'
+import { nextDue, resetChecklist } from './repeat'
 import { aggMode } from './metrics'
 
 export type Table = 'tasks' | 'logs' | 'checkins' | 'journal_entries' | 'notes' | 'goals' | 'people' | 'reviews' | 'areas' | 'metrics'
@@ -97,8 +98,22 @@ export async function restore(t: Table, row: Row) {
 export const addTask = (t: Partial<Task> & { title: string }) =>
   insert('tasks', { status: 'open', priority: 0, tags: [], area_id: null, goal_id: null, notes: null, due_date: null, due_time: null, scheduled_for: null, estimate_min: null, completed_at: null, ...t })
 
-export const setTaskDone = (id: string, done: boolean) =>
-  update('tasks', id, { status: done ? 'done' : 'open', completed_at: done ? now() : null })
+/** Done or not done. A repeating task leaves a done copy and comes back open on its next day (like TickTick). */
+export async function setTaskDone(id: string, done: boolean) {
+  const t = getState().tasks.find((x) => x.id === id)
+  await update('tasks', id, { status: done ? 'done' : 'open', completed_at: done ? now() : null })
+  if (!t?.recurrence) return
+  const tag = `repeat-of:${id}`
+  if (done) {
+    if (getState().tasks.some((x) => x.external_id === tag)) return
+    const { id: _i, created_at: _c, updated_at: _u, completed_at: _d, ...rest } = t
+    const due = nextDue(t.recurrence, t.due_date)
+    await addTask({ ...rest, title: t.title, status: 'open', due_date: due, scheduled_for: null, notes: resetChecklist(t.notes), source: 'app', external_id: tag }).catch(() => {})
+  } else {
+    const next = getState().tasks.find((x) => x.external_id === tag && x.status !== 'done')
+    if (next) await remove('tasks', next.id).catch(() => {})
+  }
+}
 
 // ---------- check-ins ----------
 export async function saveCheckin(c: Checkin) {

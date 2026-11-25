@@ -18,7 +18,7 @@ export function demoData(): Data {
   const areas: Area[] = areaDefs.map(([key, name, color], i) => ({ id: id(), key, name, color, icon: null, sort: i, archived: false }))
   const A = (k: string) => areas.find((a) => a.key === k)!.id
   const mDefs: [string, string, Metric['kind'], string | null, Metric['role'], string][] = [
-    ['mood', 'Mood', 'scale', null, 'track', 'mental'], ['anxiety', 'Anxiety', 'scale', null, 'track', 'mental'], ['energy', 'Energy', 'scale', null, 'track', 'health'],
+    ['mood', 'Mood', 'scale', null, 'track', 'mental'], ['anxiety', 'Anxiety', 'scale', null, 'track', 'mental'], ['energy', 'Energy', 'scale', null, 'track', 'health'], ['focus', 'Focus', 'scale', null, 'track', 'mental'],
     ['sleep_hours', 'Sleep', 'duration', 'h', 'health', 'health'], ['sleep_score', 'Sleep score', 'number', null, 'health', 'health'], ['hrv', 'HRV', 'number', 'ms', 'health', 'health'],
     ['resting_hr', 'Resting HR', 'number', 'bpm', 'health', 'health'], ['steps', 'Steps', 'count', null, 'health', 'health'], ['exercise', 'Exercise', 'duration', 'min', 'habit', 'health'],
     ['water', 'Water', 'count', 'glass', 'habit', 'health'], ['meditation', 'Meditation', 'duration', 'min', 'habit', 'mental'], ['study', 'Study', 'duration', 'min', 'habit', 'education'],

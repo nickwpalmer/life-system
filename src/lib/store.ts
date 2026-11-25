@@ -63,3 +63,6 @@ export const areaById = (id: string | null | undefined) => state.areas.find((a) 
 export const areaByKey = (k: string) => state.areas.find((a) => a.key === k)
 export const metricById = (id: string) => state.metrics.find((m) => m.id === id)
 export const metricByKey = (k: string) => state.metrics.find((m) => m.key === k)
+
+/** Every tag on a task, for list tiles and quick add (#shopping). */
+export const allTags = () => [...new Set(getState().tasks.flatMap((t) => t.tags ?? []))]

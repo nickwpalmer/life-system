@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
-import { useStore, setState, toast, getState } from '../lib/store'
+import { allTags, useStore, setState, toast, getState } from '../lib/store'
 import { addTask, insert } from '../lib/db'
 import { parseQuick } from '../lib/parse'
 import { fmtDay, fmtClock } from '../lib/dates'
@@ -22,8 +22,8 @@ export function Capture() {
   const ref = useRef<HTMLTextAreaElement>(null)
   useEffect(() => { if (open) { setText(''); const m = typeof open === 'string' && open !== 'mood' ? open : 'task'; setMode(m); if (open !== 'mood' && matchMedia('(pointer: fine)').matches) setTimeout(() => ref.current?.focus(), 60) } }, [open])
   const close = () => setState({ capture: false })
-  const p = parseQuick(text, areas)
-  const filed = !!(p.due_date || p.area_id)
+  const p = parseQuick(text, areas, allTags())
+  const filed = !!(p.due_date || p.area_id || p.tag)
 
   async function save(again = false) {
     const t = text.trim()
@@ -33,8 +33,8 @@ export function Capture() {
       if (mode === 'task') {
         const lines = t.split('\n').map((s) => s.trim()).filter(Boolean)
         for (const line of lines) {
-          const q = parseQuick(line, getState().areas)
-          await addTask({ title: q.title || line, due_date: q.due_date, due_time: q.due_time, priority: q.priority, area_id: q.area_id, status: q.due_date || q.area_id ? 'open' : 'inbox' })
+          const q = parseQuick(line, getState().areas, allTags())
+          await addTask({ title: q.title || line, due_date: q.due_date, due_time: q.due_time, priority: q.priority, area_id: q.area_id, recurrence: q.recurrence, tags: q.tag ? [q.tag] : [], status: q.due_date || q.area_id || q.tag ? 'open' : 'inbox' })
         }
         toast(lines.length > 1 ? `${lines.length} tasks captured` : filed ? `Added${p.due_date ? ` for ${/^(Today|Tomorrow)$/.test(fmtDay(p.due_date)) ? fmtDay(p.due_date).toLowerCase() : fmtDay(p.due_date)}` : ''}` : 'In your inbox')
       } else if (mode === 'journal') {

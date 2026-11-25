@@ -25,6 +25,8 @@ export type Task = {
   status: TaskStatus; priority: number; due_date: string | null; due_time: string | null
   scheduled_for: string | null; estimate_min: number | null
   completed_at: string | null; created_at: string; updated_at?: string; tags: string[]; source?: string
+  /** daily, weekdays, weekly, biweekly, monthly, yearly (see lib/repeat). */
+  recurrence?: string | null; parent_id?: string | null; external_id?: string | null
 }
 
 export type Checkin = {

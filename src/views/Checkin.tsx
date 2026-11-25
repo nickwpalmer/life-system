@@ -38,7 +38,7 @@ export function CheckinView({ kind }: { kind: 'morning' | 'night' }) {
     // Mood, energy and stress from a check-in also fill the daily log, so charts have one source.
     const put = (key: string, v: number | null) => { const m = metricByKey(key); if (m && v != null) setDaily(m, day, v) }
     if (kind === 'morning' && sleepM && sleep !== '') setDaily(sleepM, day, Number(sleep))
-    if (kind === 'night') { put('mood', c.mood); put('energy', c.energy); put('anxiety', c.stress) }
+    if (kind === 'night') { put('mood', c.mood); put('energy', c.energy); put('focus', c.focus); put('anxiety', c.stress) }
   }
   async function finish(btn: Element | null) {
     try {
@@ -83,6 +83,7 @@ export function CheckinView({ kind }: { kind: 'morning' | 'night' }) {
   const night: Step[] = [
     scale('mood', 'How was today, overall?'),
     scale('energy', 'Energy by the end?', 'Drained', 'Charged', 'cool'),
+    scale('focus', 'How focused were you?', 'Scattered', 'Locked in', 'cool'),
     scale('stress', 'Stress or anxiety today?', 'Calm', 'Maxed', 'rev'),
     text('win', 'A win from today', 'Big or small'),
     text('lesson', 'What did today teach you?', 'A lesson or something to change'),

@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'preact/hooks'
-import { useStore, toast, areaById, getState } from '../lib/store'
+import { useStore, toast, areaById, getState, allTags } from '../lib/store'
+import { REPEATS, repeatLabel, nextDue } from '../lib/repeat'
 import { addTask, setTaskDone, update, remove, restore } from '../lib/db'
 import { parseQuick } from '../lib/parse'
 import { today, inDays, fmtDay, fmtClock, daysUntil, weekStart, dayKey, addDays } from '../lib/dates'
@@ -48,7 +49,7 @@ export function TaskRow({ t, onOpen, process }: { t: Task; onOpen: (t: Task) => 
     e.stopPropagation(); haptic()
     if (!done) burst(e.currentTarget as Element)
     setTaskDone(t.id, !done).catch(() => {})
-    if (!done) toast('Done', () => setTaskDone(t.id, false))
+    if (!done) toast(t.recurrence ? `Done. Next one ${fmtDay(nextDue(t.recurrence, t.due_date))}` : 'Done', () => setTaskDone(t.id, false))
   }
   const file = (patch: Partial<Task>, msg: string) => { update('tasks', t.id, { status: 'open', ...patch }).then(() => toast(msg)).catch(() => {}) }
   return (
@@ -58,11 +59,12 @@ export function TaskRow({ t, onOpen, process }: { t: Task; onOpen: (t: Task) => 
         <div class="t-title"><PeopleText text={t.title} /></div>
         <div class="t-meta">
           {dueLabel(t)}
+          {t.recurrence && <span class="row" style="gap:3px" title={repeatLabel(t.recurrence) ?? ''}><Icon name="repeat" size={12} />{repeatLabel(t.recurrence)}</span>}
           {(() => { const c = checklist(t.notes); return c.length ? <span class="row" style="gap:3px"><Icon name="list" size={12} />{c.filter((x) => x.done).length}/{c.length}</span> : null })()}
           {a && <span class="pill" style={`--c:${a.color}`}>{a.name}</span>}
           {t.status === 'waiting' && <span class="pill" style="--c:var(--sky)">Waiting</span>}
           {goal && <span class="row" style="gap:3px"><Icon name="target" size={12} />{goal.title}</span>}
-          {t.tags?.filter((x) => x !== 'someday').slice(0, 2).map((x) => <span>#{x}</span>)}
+          {t.tags?.filter((x) => x !== 'someday' && !courseOf({ ...t, tags: [x] } as Task)).slice(0, 2).map((x) => <span>#{x}</span>)}
         </div>
         {process && !done && (
           <div class="process" onClick={(e) => e.stopPropagation()}>
@@ -86,9 +88,9 @@ export function TaskSheet({ task, onClose }: { task: Task | null; onClose: () =>
   if (!task) return <Sheet open={false} onClose={onClose}>{null}</Sheet>
   async function save() {
     if (!f.title?.trim()) return
-    const { title, notes, area_id, due_date, due_time, priority, status, goal_id, tags } = f
+    const { title, notes, area_id, due_date, due_time, priority, status, goal_id, tags, recurrence } = f
     const st = status === 'inbox' && (due_date || area_id) ? 'open' : status
-    try { await update('tasks', task!.id, { title: title.trim(), notes: notes || null, area_id: area_id ?? null, due_date: due_date || null, due_time: due_time || null, priority: priority ?? 0, status: st, goal_id: goal_id ?? null, tags: tags ?? [] }); onClose() } catch { /* shown */ }
+    try { await update('tasks', task!.id, { title: title.trim(), notes: notes || null, area_id: area_id ?? null, due_time: due_time || null, priority: priority ?? 0, status: st, goal_id: goal_id ?? null, tags: tags ?? [], recurrence: recurrence || null, due_date: recurrence && !due_date ? today() : due_date || null }); onClose() } catch { /* shown */ }
   }
   async function del() {
     const row = getState().tasks.find((x) => x.id === task!.id)
@@ -105,6 +107,7 @@ export function TaskSheet({ task, onClose }: { task: Task | null; onClose: () =>
           <span class="tbox"><Icon name="check" size={12} stroke={3} /></span><span class="grow">{c.text}</span>
         </button>
       ))}</div>}
+      <Subtasks task={task} />
       <textarea class="input" style="margin:8px 0 14px;min-height:70px" placeholder="Notes, links, next step… Start a line with - [ ] for a checklist" value={f.notes ?? ''} onInput={(e) => setF({ ...f, notes: (e.target as HTMLTextAreaElement).value })} />
       <div class="row">
         <label class="field grow"><span>Do by</span><input class="input" type="date" value={f.due_date ?? ''} onInput={(e) => setF({ ...f, due_date: (e.target as HTMLInputElement).value || null })} /></label>
@@ -113,6 +116,9 @@ export function TaskSheet({ task, onClose }: { task: Task | null; onClose: () =>
       <div class="chips" style="margin:-4px 0 14px">
         {BY.map(([l, fn]) => { const d = fn(); return <button class={`chip ${f.due_date === d ? 'on' : ''}`} onClick={() => setF({ ...f, due_date: d })}>{l}</button> })}
       </div>
+      <div class="field"><span>Repeat</span><div class="chips">
+        {REPEATS.map(([k, l]) => <button class={`chip ${f.recurrence === k ? 'on' : ''}`} style="--c:var(--teal)" onClick={() => setF({ ...f, recurrence: f.recurrence === k ? null : k })}>{l}</button>)}
+      </div></div>
       <div class="field"><span>Area</span><div class="chips">{areas.map((a) => <button class={`chip ${f.area_id === a.id ? 'on' : ''}`} style={`--c:${a.color}`} onClick={() => setF({ ...f, area_id: f.area_id === a.id ? null : a.id })}><i class="dot" style={`background:${a.color}`} />{a.name}</button>)}</div></div>
       <div class="field"><span>Priority</span><div class="chips">{[['None', 0, 'var(--faint)'], ['Low', 1, 'var(--sky)'], ['Medium', 2, 'var(--orange)'], ['High', 3, 'var(--coral)']].map(([l, p, c]) => <button class={`chip ${f.priority === p ? 'on' : ''}`} style={`--c:${c}`} onClick={() => setF({ ...f, priority: p as number })}>{l}</button>)}</div></div>
       <div class="field"><span>Status</span><div class="chips">
@@ -126,20 +132,40 @@ export function TaskSheet({ task, onClose }: { task: Task | null; onClose: () =>
   )
 }
 
+/** Steps of a bigger task: real tasks with parent_id, shown inside the parent. A child shows which task it belongs to. */
+function Subtasks({ task }: { task: Task }) {
+  const kids = useStore((s) => s.tasks.filter((x) => x.parent_id === task.id && x.status !== 'dropped'))
+  const parent = useStore((s) => task.parent_id ? s.tasks.find((x) => x.id === task.parent_id) : undefined)
+  const [v, setV] = useState('')
+  return (
+    <div class="subtasks">
+      {parent && <div class="faint tiny" style="margin:2px 0 8px"><Icon name="layers" size={12} /> Step of: {parent.title}</div>}
+      {kids.length > 0 && <div class="tchecks">{kids.sort((a, b) => a.created_at.localeCompare(b.created_at)).map((k) => (
+        <button class={`tcheck ${k.status === 'done' ? 'on' : ''}`} onClick={() => { haptic(); setTaskDone(k.id, k.status !== 'done').catch(() => {}) }}>
+          <span class="tbox"><Icon name="check" size={12} stroke={3} /></span><span class="grow">{k.title}</span>
+        </button>
+      ))}</div>}
+      {!task.parent_id && <form class="add-row" style="margin:4px 0 2px" onSubmit={(e) => { e.preventDefault(); const t = v.trim(); if (!t) return; setV(''); addTask({ title: t, parent_id: task.id, area_id: task.area_id, tags: task.tags ?? [], status: 'open' }).catch(() => {}) }}>
+        <input class="input" style="height:38px;font-size:14px" placeholder="+ Add a step" value={v} onInput={(e) => setV((e.target as HTMLInputElement).value)} />
+      </form>}
+    </div>
+  )
+}
+
 /** Quick add bar: understands dates, times, !priority and #area as you type. */
 export function AddTask({ defaults, placeholder = 'Add a task' }: { defaults?: Partial<Task>; placeholder?: string }) {
   const areas = useStore((s) => s.areas)
   const [v, setV] = useState('')
   const [focus, setFocus] = useState(false)
-  const p = parseQuick(v, areas)
+  const p = parseQuick(v, areas, allTags())
   async function add(e: Event) {
     e.preventDefault()
     if (!v.trim()) return
     const title = p.title || v.trim()
     setV('')
     const d = defaults ?? {}
-    const status = d.status === 'inbox' && (p.due_date || p.area_id) ? 'open' : d.status ?? 'open'
-    addTask({ ...d, title, status, due_date: p.due_date ?? d.due_date ?? null, due_time: p.due_time, priority: p.priority || d.priority || 0, area_id: p.area_id ?? d.area_id ?? null }).catch(() => {})
+    const status = d.status === 'inbox' && (p.due_date || p.area_id || p.tag) ? 'open' : d.status ?? 'open'
+    addTask({ ...d, title, status, due_date: p.due_date ?? d.due_date ?? null, due_time: p.due_time, priority: p.priority || d.priority || 0, area_id: p.area_id ?? d.area_id ?? null, recurrence: p.recurrence ?? d.recurrence ?? null, tags: [...new Set([...(d.tags ?? []), ...(p.tag ? [p.tag] : [])])] }).catch(() => {})
   }
   const a = areas.find((x) => x.id === p.area_id)
   return (
@@ -148,7 +174,7 @@ export function AddTask({ defaults, placeholder = 'Add a task' }: { defaults?: P
         <input class="input" placeholder={placeholder} value={v} onFocus={() => setFocus(true)} onBlur={() => setTimeout(() => setFocus(false), 150)} onInput={(e) => setV((e.target as HTMLInputElement).value)} />
         {v.trim() && <button class="icon-btn add-go" aria-label="Add task"><Icon name="plus" stroke={2.6} /></button>}
       </div>
-      {(focus || v.trim()) && <p class="hint">{v.trim() && (p.due_date || a || p.priority) ? <>{p.due_date && <><b>{fmtDay(p.due_date)}</b>{p.due_time ? <> {fmtClock(p.due_time)}</> : null} </>}{a && <><b>{a.name}</b> </>}{p.priority ? <b>{p.priority === 3 ? 'high' : 'medium'} priority</b> : null}</> : 'Add a day, time or #area, like “essay fri 5pm #education”.'}</p>}
+      {(focus || v.trim()) && <p class="hint">{v.trim() && (p.due_date || a || p.priority || p.recurrence || p.tag) ? <>{p.due_date && <><b>{fmtDay(p.due_date)}</b>{p.due_time ? <> {fmtClock(p.due_time)}</> : null} </>}{p.recurrence && <><b>{repeatLabel(p.recurrence)!.toLowerCase()}</b> </>}{a && <><b>{a.name}</b> </>}{p.tag && <><b>#{p.tag}</b> </>}{p.priority ? <b>{p.priority === 3 ? 'high' : 'medium'} priority</b> : null}</> : 'Add a day, time, repeat or #area, like “essay fri 5pm #education” or “gym every mon”.'}</p>}
     </form>
   )
 }
@@ -216,6 +242,7 @@ function Overview({ go }: { go: (v: View) => void }) {
   const t0 = today()
   const live = tasks.filter((t) => openTask(t) && t.status !== 'inbox')
   const inbox = tasks.filter((t) => t.status === 'inbox').length
+  const lists = listTags(tasks)
   const cards = [...areas.filter((a) => !a.archived), { id: null, key: 'none', name: 'No area', color: 'var(--faint)' }].map((a) => {
     const mine = live.filter((t) => (t.area_id ?? null) === a.id)
     return { a, open: mine.length, late: mine.filter((t) => t.due_date && t.due_date < t0).length, today: mine.filter((t) => t.due_date === t0 || t.status === 'doing').length, week: mine.filter((t) => t.due_date && t.due_date > t0 && daysUntil(t.due_date) <= 7).length }
@@ -232,11 +259,40 @@ function Overview({ go }: { go: (v: View) => void }) {
           </a>
         ))}
       </div>
+      {lists.length > 0 && <>
+        <div class="group-h" style="margin:18px 4px 8px"><span>Lists</span><span class="faint">type #name to add</span></div>
+        <div class="chips">{lists.map(([g, n]) => <a class="chip" style="--c:var(--teal)" href={`#/tasks/list-${encodeURIComponent(g)}`}><Icon name="list" size={15} />{g}<span class="badge quiet" style="height:18px;min-width:18px;font-size:11px">{n}</span></a>)}</div>
+      </>}
+    </>
+  )
+}
+
+/** Tags that work as lists (Shopping, car…): not class codes, not someday. */
+const NOT_LISTS = new Set(['someday', 'personal'])
+export const listTags = (tasks: Task[]) => {
+  const n = new Map<string, number>()
+  for (const t of tasks) if (openTask(t)) for (const g of t.tags ?? []) if (!NOT_LISTS.has(g.toLowerCase()) && !courseOf({ ...t, title: '', tags: [g] })) n.set(g, (n.get(g) ?? 0) + 1)
+  return [...n].sort((a, b) => b[1] - a[1])
+}
+
+/** One list (a tag): everything open with it, plus a quick add that files into it. */
+function TagTasks({ tag }: { tag: string }) {
+  const tasks = useStore((s) => s.tasks)
+  const [edit, setEdit] = useState<Task | null>(null)
+  const mine = tasks.filter((t) => openTask(t) && t.tags?.some((g) => g.toLowerCase() === tag.toLowerCase())).sort(sortTasks('due'))
+  const name = mine[0]?.tags?.find((g) => g.toLowerCase() === tag.toLowerCase()) ?? tag
+  return (
+    <>
+      <PageHead title={name} sub={`${mine.length} open`} back="#/tasks" icon="list" color="var(--teal)" />
+      <AddTask defaults={{ tags: [name], status: 'open' }} placeholder={`Add to ${name}…`} />
+      <section class="card" style="--accent:var(--teal)">{mine.length ? mine.map((t) => <TaskRow t={t} onOpen={setEdit} />) : <p class="empty">Nothing on this list.</p>}</section>
+      <TaskSheet task={edit} onClose={() => setEdit(null)} />
     </>
   )
 }
 
 export function Tasks({ initial, areaKey }: { initial?: View; areaKey?: string }) {
+  if (areaKey?.startsWith('list-')) return <TagTasks tag={decodeURIComponent(areaKey.slice(5))} />
   if (areaKey) return <AreaTasks areaKey={areaKey} />
   return <TaskLists initial={initial} />
 }

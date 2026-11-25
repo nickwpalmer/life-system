@@ -4,6 +4,10 @@ import { PageHead } from '../ui/kit'
 import { HealthSync } from './HealthSync'
 
 const QA: [string, string][] = [
+  ['How do I add tasks fast?', 'Type it the way you’d say it. “calc hw fri 5pm !!” sets Friday at 5 PM, high priority. “#education” files it in an area, and any other #word puts it on a list, like “#shopping”. “gym every mon”, “daily”, “weekdays”, “weekly”, “every other week”, “monthly” and “yearly” make it repeat. The line under the box shows what it understood before you add it.'],
+  ['How do repeating tasks work?', 'Check one off and it comes back open on its next day, with a fresh checklist. The finished one stays in Done, so your history is kept. Finish late and it skips ahead to the next date that’s still to come. Open a task and pick Repeat to change or stop it.'],
+  ['What are Lists and steps?', 'Lists are tags, like Shopping or car. They show at the bottom of Tasks, and typing #name adds to one. For a bigger task, open it and use “+ Add a step”: each step is its own task you can check off, shown inside the bigger one.'],
+  ['How do reminders work?', 'Claude reads your tasks and brings up what’s due when it checks in with you. For a reminder at an exact time, tell Claude in the chat (“remind me at 3 to call the broker”). Phone alerts from the app itself aren’t built, on purpose, to keep it simple.'],
   ['How do I put Life on my iPhone Home Screen?', 'Open the app in Safari, tap Share, then Add to Home Screen. It opens full screen like any other app.'],
   ['I changed the logo. Why is the old one still on my Home Screen?', 'iPhone saves the icon when you add the app. After you pick a new logo in Settings, press and hold the Life icon, remove it from the Home Screen (not delete data, nothing is lost), then add it again from Safari.'],
   ['How do I use it on my Mac?', 'Open the app in Safari, then choose File, Add to Dock. Your iPhone passkey syncs through iCloud Keychain, so the Mac signs in with Touch ID or your iPhone. If it doesn’t show up, sign in with your password once and tap “Add Face ID on this device” in Settings.'],

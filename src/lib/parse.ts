@@ -16,15 +16,18 @@ function futureDate(m: number, d: number) {
   return dayKey(new Date(y, m, d))
 }
 
-export type Parsed = { title: string; due_date: string | null; due_time: string | null; priority: number; area_id: string | null; when: string | null }
+export type Parsed = { title: string; due_date: string | null; due_time: string | null; priority: number; area_id: string | null; when: string | null; recurrence: string | null; tag: string | null }
 
 /**
  * Natural quick-add: "calc hw tomorrow 5pm !! #edu".
  * Dates: today, tonight, tomorrow, mon..sun, next week, in 3 days, 12/5, dec 5. Priority: ! / !!. Area: #name.
+ * Repeats: daily, every day, weekdays, weekly, every monday, every other week, monthly, yearly.
+ * A #word that isn't an area becomes a list tag (#shopping).
  */
-export function parseQuick(input: string, areas: Area[]): Parsed {
+export function parseQuick(input: string, areas: Area[], tags: string[] = []): Parsed {
   let s = ` ${input.trim()} `
   let due: string | null = null, time: string | null = null, when: string | null = null, area: string | null = null
+  let recurrence: string | null = null, tag: string | null = null
   const priority = /!!/.test(s) ? 3 : /!/.test(s) ? 2 : 0
   s = s.replace(/!+/g, ' ')
   const take = (re: RegExp, f: (m: RegExpMatchArray) => void) => { const m = s.match(re); if (m) { f(m); s = s.replace(re, ' ') } }
@@ -33,6 +36,16 @@ export function parseQuick(input: string, areas: Area[]): Parsed {
     const q = m[1].toLowerCase()
     const a = areas.find((x) => x.key.startsWith(q) || x.name.toLowerCase().startsWith(q))
     if (a) area = a.id
+    else tag = tags.find((x) => x.toLowerCase() === q) ?? m[1][0].toUpperCase() + m[1].slice(1)
+  })
+  take(/\s(?:every\s?day|daily)\s/i, () => { recurrence = 'daily' })
+  take(/\s(?:every\s)?weekdays?\s/i, () => { recurrence = 'weekdays' })
+  take(/\s(?:every other week|every 2 weeks|biweekly)\s/i, () => { recurrence = 'biweekly' })
+  take(/\s(?:every\s?week|weekly)\s/i, () => { recurrence = 'weekly' })
+  take(/\s(?:every\s?month|monthly)\s/i, () => { recurrence = 'monthly' })
+  take(/\s(?:every\s?year|yearly|annually)\s/i, () => { recurrence = 'yearly' })
+  take(/\severy\s(sun|mon|tue|tues|wed|thu|thur|thurs|fri|sat)(?:day|nesday|rsday|urday)?\s/i, (m) => {
+    recurrence = 'weekly'; due = nextWeekday(WD.indexOf(m[1].slice(0, 3).toLowerCase())); when = `every ${m[1]}`
   })
   take(/\s(?:at\s)?(\d{1,2})(?::(\d{2}))?\s?(am|pm)\s/i, (m) => {
     let h = Number(m[1]) % 12; if (m[3].toLowerCase() === 'pm') h += 12
@@ -50,5 +63,6 @@ export function parseQuick(input: string, areas: Area[]): Parsed {
     due = futureDate(MON.indexOf(m[1].slice(0, 3).toLowerCase()), Number(m[2])); when = m[0].trim()
   })
   const title = s.replace(/\s+/g, ' ').trim()
-  return { title: title ? title[0].toUpperCase() + title.slice(1) : '', due_date: due, due_time: time, priority, area_id: area, when }
+  if (recurrence && !due) due = inDays(0)
+  return { title: title ? title[0].toUpperCase() + title.slice(1) : '', due_date: due, due_time: time, priority, area_id: area, when, recurrence, tag }
 }
