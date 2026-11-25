@@ -9,6 +9,8 @@ import { Icon } from '../ui/icons'
 import { Sheet, PageHead, burst, haptic, SortBtn, useSort } from '../ui/kit'
 import { PeopleText } from './People'
 
+const lowDay = (d: string) => { const s = fmtDay(d); return /^(Today|Tomorrow)$/.test(s) ? s.toLowerCase() : s }
+
 export const openTask = (t: Task) => t.status !== 'done' && t.status !== 'dropped'
 
 /** "Do it by" shortcuts: end of this week (Sunday) and end of this month. */
@@ -49,7 +51,7 @@ export function TaskRow({ t, onOpen, process }: { t: Task; onOpen: (t: Task) => 
     e.stopPropagation(); haptic()
     if (!done) burst(e.currentTarget as Element)
     setTaskDone(t.id, !done).catch(() => {})
-    if (!done) toast(t.recurrence ? `Done. Next one ${fmtDay(nextDue(t.recurrence, t.due_date))}` : 'Done', () => setTaskDone(t.id, false))
+    if (!done) toast(t.recurrence ? `Done. Next one ${lowDay(nextDue(t.recurrence, t.due_date))}` : 'Done', () => setTaskDone(t.id, false))
   }
   const file = (patch: Partial<Task>, msg: string) => { update('tasks', t.id, { status: 'open', ...patch }).then(() => toast(msg)).catch(() => {}) }
   return (
@@ -174,7 +176,7 @@ export function AddTask({ defaults, placeholder = 'Add a task' }: { defaults?: P
         <input class="input" placeholder={placeholder} value={v} onFocus={() => setFocus(true)} onBlur={() => setTimeout(() => setFocus(false), 150)} onInput={(e) => setV((e.target as HTMLInputElement).value)} />
         {v.trim() && <button class="icon-btn add-go" aria-label="Add task"><Icon name="plus" stroke={2.6} /></button>}
       </div>
-      {(focus || v.trim()) && <p class="hint">{v.trim() && (p.due_date || a || p.priority || p.recurrence || p.tag) ? <>{p.due_date && <><b>{fmtDay(p.due_date)}</b>{p.due_time ? <> {fmtClock(p.due_time)}</> : null} </>}{p.recurrence && <><b>{repeatLabel(p.recurrence)!.toLowerCase()}</b> </>}{a && <><b>{a.name}</b> </>}{p.tag && <><b>#{p.tag}</b> </>}{p.priority ? <b>{p.priority === 3 ? 'high' : 'medium'} priority</b> : null}</> : 'Add a day, time, repeat or #area, like “essay fri 5pm #education” or “gym every mon”.'}</p>}
+      {(focus || v.trim()) && <p class="hint">{v.trim() && (p.due_date || a || p.priority || p.recurrence || p.tag) ? <>{p.recurrence && <><b>{repeatLabel(p.recurrence)}</b>{p.due_date ? <>, from {lowDay(p.due_date)}</> : null}{p.due_time ? <> at {fmtClock(p.due_time)}</> : null} </>}{!p.recurrence && p.due_date && <><b>{fmtDay(p.due_date)}</b>{p.due_time ? <> {fmtClock(p.due_time)}</> : null} </>}{a && <><b>{a.name}</b> </>}{p.tag && <><b>#{p.tag}</b> </>}{p.priority ? <b>{p.priority === 3 ? 'high' : 'medium'} priority</b> : null}</> : 'Add a day, time, repeat or #area, like “essay fri 5pm #education” or “gym every mon”.'}</p>}
     </form>
   )
 }
