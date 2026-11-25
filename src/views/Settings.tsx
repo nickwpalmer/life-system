@@ -12,7 +12,7 @@ import { syncAll, syncRing, sourceTimes } from '../lib/sync'
 import { usePrefs, savePrefs, LOGOS, logoUrl } from '../lib/prefs'
 import { relTime, fmtShort, daysBetween, today } from '../lib/dates'
 
-export const VERSION = 'v0.5'
+export const VERSION = 'v0.5.1'
 import { NAV } from '../app'
 
 type Passkey = { id: string; friendly_name?: string; created_at: string; last_used_at?: string }
@@ -199,7 +199,6 @@ function Conn({ name, icon, sub, state, children }: { name: string; icon: string
       <button class="conn" onClick={() => children && setOpen(!open)} aria-expanded={open}>
         <span class="m-ico"><Icon name={icon} size={18} /></span><span class="grow"><div>{name}</div><div class="faint tiny">{sub}</div></span>
         <i class={`cstat ${state}`} aria-label={state === 'ok' ? 'Working' : state === 'warn' ? 'Behind' : 'Not set up'} />
-        {children && <span class={`g-chev ${open ? 'on' : ''}`}><Icon name="chev" size={15} /></span>}
       </button>
       {open && children}
     </div>
@@ -279,7 +278,7 @@ export function Settings() {
         <p class="faint small" style="margin:-4px 0 6px">Your categories for tasks, goals and the calendar.</p>
         {areas.map((a) => (
           <button class="row between area-row" style={a.archived ? 'opacity:.45' : ''} onClick={() => setAEdit({ open: true, a })}>
-            <span class="row"><i class="dot" style={`background:${a.color};box-shadow:0 0 10px -2px ${a.color}`} />{a.name}</span><span class="faint"><Icon name="chev" size={16} /></span>
+            <span class="row"><i class="dot" style={`background:${a.color};box-shadow:0 0 10px -2px ${a.color}`} />{a.name}</span>
           </button>
         ))}
       </section>
@@ -288,7 +287,7 @@ export function Settings() {
 
       <a class="card prompt" href="#/help" style="--accent:var(--sky)"><span class="orb"><Icon name="help" size={20} /></span><span class="grow"><h3>Help</h3><p class="muted small">The ring, updates, undoing a check-in</p></span><Icon name="chev" /></a>
 
-      <button class="row between adv-toggle" onClick={() => setAdv(!adv)} aria-expanded={adv}><span class="faint small">Advanced</span><span class={`g-chev ${adv ? 'on' : ''}`}><Icon name="chev" size={15} /></span></button>
+      <button class="row between adv-toggle" onClick={() => setAdv(!adv)} aria-expanded={adv}><span class="faint small">{adv ? 'Hide advanced' : 'Advanced'}</span></button>
       {adv && <button class="card prompt" style="--accent:var(--violet);width:100%;text-align:left" onClick={() => setTrackersOpen(true)}>
         <span class="orb"><Icon name="sliders" size={20} /></span><span class="grow"><h3>Trackers</h3><p class="muted small">{on.length} on · what the daily log asks about</p></span><Icon name="chev" />
       </button>}

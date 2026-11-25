@@ -181,6 +181,11 @@ export function Substances() {
   const choose = (n: string | null) => { setSel(n); window.scrollTo({ top: 0, behavior: 'smooth' }) }
   const wk = dayKey(weekStart())
   const countWeek = (n: string) => (rows ?? []).filter((r) => subKey(r.substance) === subKey(n) && dayKey(new Date(r.occurred_at)) >= wk).length
+  // Most used this week first; the line above the filters says the week in one go.
+  const byWeek = [...used].sort((a, b) => countWeek(b) - countWeek(a) || a.localeCompare(b))
+  const wkTotal = (rows ?? []).filter((r) => dayKey(new Date(r.occurred_at)) >= wk).length
+  const top = byWeek.filter((n) => countWeek(n) > 0).slice(0, 3).map((n) => `${n} ${countWeek(n)}`)
+  const weekLine = wkTotal ? `This week: ${wkTotal} entr${wkTotal === 1 ? 'y' : 'ies'}${top.length ? ` · ${top.join(', ')}` : ''}` : 'Nothing logged this week yet.'
   const list = (rows ?? []).filter((r) => !sel || subKey(r.substance) === subKey(sel)).sort((a, b) => newest ? b.occurred_at.localeCompare(a.occurred_at) : a.occurred_at.localeCompare(b.occurred_at))
   const groups = new Map<string, Sub[]>()
   for (const r of list.slice(0, 200)) { const d = dayKey(new Date(r.occurred_at)); groups.set(d, [...(groups.get(d) ?? []), r]) }
@@ -192,11 +197,11 @@ export function Substances() {
         <div class="card soft"><p class="muted">Nothing logged yet. Tap Log, or the + button. Coffee, a drink, a supplement or a med all go here.</p></div>
       ) : (
         <>
-          <div class="sub-pick">
-            <button class={`sub-tile ${!sel ? 'on' : ''}`} onClick={() => choose(null)}><b>All</b><span>{rows.length} logged</span></button>
-            {used.map((n) => <button class={`sub-tile ${sel === n ? 'on' : ''}`} style={`--c:${subColor(n, names)}`} onClick={() => choose(sel === n ? null : n)}><b>{n}</b><span>{countWeek(n)} this week</span></button>)}
+          <p class="muted small sub-week">{weekLine}</p>
+          <div class="chip-scroll">
+            <button class={`chip ${!sel ? 'on' : ''}`} onClick={() => choose(null)}>All</button>
+            {byWeek.map((n) => <button class={`chip ${sel === n ? 'on' : ''}`} style={`--c:${subColor(n, names)}`} onClick={() => choose(sel === n ? null : n)}>{n}</button>)}
           </div>
-          {sel && <Detail name={sel} rows={rows} color={subColor(sel, names)} />}
           <Card title={sel ? `${sel} log` : 'Log'} icon="list" accent="var(--orange)" action={<button class="faint small" onClick={() => setNewest(!newest)}>{newest ? 'Newest first' : 'Oldest first'}</button>}>
             {[...groups].map(([d, items]) => (
               <div class="sublog">
@@ -206,12 +211,12 @@ export function Substances() {
                     <i class="dot" style={`background:${subColor(nameFor(r, names), names)}`} />
                     <span class="grow" style="min-width:0"><b class="w5">{nameFor(r, names)}</b>{fmtAmt(r) && <span class="muted"> {fmtAmt(r)}</span>}{r.note && <div class="faint small">{r.note}</div>}</span>
                     <span class="faint small">{r.time_known ? fmtTime(r.occurred_at) : 'No time'}</span>
-                    <Icon name="chev" size={15} />
                   </button>
                 ))}
               </div>
             ))}
           </Card>
+          {sel && <Detail name={sel} rows={rows} color={subColor(sel, names)} />}
         </>
       )}
       <SubstanceSheet open={open} onClose={() => setOpen(false)} initial={sel ?? undefined} />

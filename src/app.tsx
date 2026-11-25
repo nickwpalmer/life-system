@@ -79,21 +79,17 @@ function Fab() {
     const f = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
     addEventListener('keydown', f); return () => removeEventListener('keydown', f)
   }, [open])
-  const n = FAN.length
   return (
     <>
       {open && <div class="fan-back" onClick={() => setOpen(false)} />}
       <div class={`fan ${open ? 'open' : ''}`} aria-hidden={!open}>
-        {FAN.map((f, i) => {
-          // A quarter circle up and to the left of the button.
-          const a = 0.24 + (Math.PI / 2 - 0.24) * (i / (n - 1)), r = 172
-          return (
-            <button class="fan-item" style={`--c:${f.c};--x:${-Math.round(Math.cos(a) * r)}px;--y:${-Math.round(Math.sin(a) * r)}px;--d:${i * 28}ms`} tabIndex={open ? 0 : -1}
-              onClick={() => { haptic(); setOpen(false); f.go() }} aria-label={f.label}>
-              <span class="fan-ico"><Icon name={f.icon} size={21} /></span><span class="fan-label">{f.label}</span>
-            </button>
-          )
-        })}
+        {FAN.map((f, i) => (
+          // A column above the button, nearest first, each label in its own pill to the left.
+          <button class="fan-item" style={`--c:${f.c};--d:${i * 24}ms`} tabIndex={open ? 0 : -1}
+            onClick={() => { haptic(); setOpen(false); f.go() }} aria-label={f.label}>
+            <span class="fan-label">{f.label}</span><span class="fan-ico"><Icon name={f.icon} size={20} /></span>
+          </button>
+        ))}
       </div>
       <button class={`fab ${open ? 'open' : ''}`} aria-label={open ? 'Close' : 'Log something'} aria-expanded={open} onClick={() => { haptic(); setOpen(!open) }}><Icon name="plus" size={26} stroke={2.4} /></button>
     </>
