@@ -99,8 +99,9 @@ export function Toast() {
   if (!t) return null
   return (
     <div class="toast" key={t.id} role="status">
+      {!t.undo && <Icon name="check" size={16} />}
       <span>{t.text}</span>
-      {t.undo ? <button onClick={() => { t.undo!(); setState({ toast: null }) }}>Undo</button> : <span style="width:8px" />}
+      {t.undo && <button onClick={() => { t.undo!(); setState({ toast: null }) }}>Undo</button>}
     </div>
   )
 }

@@ -77,13 +77,17 @@ function Dash() {
   const t = today()
   const id = (k: string) => metrics.find((m) => m.key === k)?.id
   const of = (k: string) => logs.filter((l) => l.metric_id === id(k) && l.value_num != null)
-  const onDay = (k: string, d: string) => of(k).filter((l) => dayKey(new Date(l.occurred_at)) === d).sort((a, b) => b.occurred_at.localeCompare(a.occurred_at))[0]?.value_num ?? null
   const todayTimed = (k: string) => of(k).filter((l) => dayKey(new Date(l.occurred_at)) === t).sort((a, b) => a.occurred_at.localeCompare(b.occurred_at))
   const week = Array.from({ length: 7 }, (_, i) => dayKey(new Date(Date.now() - (6 - i) * 864e5)))
   const avg = (k: string, d: string) => { const v = of(k).filter((l) => dayKey(new Date(l.occurred_at)) === d).map((l) => l.value_num!); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null }
   const mood = todayTimed('mood'), stress = todayTimed('anxiety')
-  const sleep = onDay('sleep_hours', t) ?? onDay('sleep_hours', dayKey(new Date(Date.now() - 864e5)))
-  const steps = onDay('steps', t)
+  // Sleep and steps come from the ring or Apple Health, which can lag a few days; show the newest one with its date.
+  const newest = (k: string) => { const l = of(k).sort((a, b) => b.occurred_at.localeCompare(a.occurred_at))[0]; return l ? { v: l.value_num!, d: dayKey(new Date(l.occurred_at)), src: l.source } : null }
+  const yday = dayKey(new Date(Date.now() - 864e5))
+  const sl = newest('sleep_hours'), st = newest('steps')
+  const sleep = sl && daysBetween(sl.d, t) <= 14 ? sl : null
+  const steps = st && daysBetween(st.d, t) <= 14 ? st : null
+  const when = (x: { d: string; src?: string | null }, near: string) => `${x.d === t || x.d === yday ? near : fmtShort(x.d)}${x.src === 'ring' ? ' · ring' : ''}`
   const due = tasks.filter((x) => openTask(x) && x.status !== 'inbox' && (x.due_date === t || x.scheduled_for === t)).length
   const done = tasks.filter((x) => x.status === 'done' && x.completed_at && dayKey(new Date(x.completed_at)) === t).length
   const subN = (subs ?? []).filter((r) => dayKey(new Date(r.occurred_at)) === t).length
@@ -96,8 +100,8 @@ function Dash() {
     <section class="dash">
       {tile(`#/log/${t}`, 'var(--orange)', 'Mood', last(mood) ? String(last(mood)!.value_num) : '–', last(mood) ? `${mood.length}× today · ${fmtTime(last(mood)!.occurred_at)}` : 'Tap + to log', spark('mood'))}
       {tile(`#/log/${t}`, 'var(--coral)', 'Stress', last(stress) ? String(last(stress)!.value_num) : '–', last(stress) ? `last at ${fmtTime(last(stress)!.occurred_at)}` : 'Not logged', spark('anxiety'))}
-      {tile('#/health', 'var(--sky)', 'Sleep', sleep != null ? `${Math.round(sleep * 10) / 10}h` : '–', sleep != null ? 'last night' : 'Waiting on Health', spark('sleep_hours', 10))}
-      {tile('#/health', 'var(--mint)', 'Steps', steps != null ? steps.toLocaleString() : '–', steps != null ? 'today' : 'Waiting on Health')}
+      {tile('#/health', 'var(--sky)', 'Sleep', sleep ? `${Math.round(sleep.v * 10) / 10}h` : '–', sleep ? when(sleep, 'last night') : 'No recent data', spark('sleep_hours', 10))}
+      {tile('#/health', 'var(--mint)', 'Steps', steps ? Math.round(steps.v).toLocaleString() : '–', steps ? when(steps, steps.d === t ? 'today' : 'yesterday') : 'No recent data')}
       {tile('#/tasks', 'var(--violet)', 'Tasks', `${done}/${done + due}`, 'done today', <span class="dbar"><i style={`width:${done + due ? (done / (done + due)) * 100 : 0}%`} /></span>)}
       {tile('#/substances', 'var(--gold)', 'Substances', String(subN), 'logged today')}
     </section>

@@ -64,7 +64,7 @@ p { margin: 0; }
 
 /* ---------- layout ---------- */
 .shell { position: relative; z-index: 1; }
-.app { position: relative; max-width: 640px; margin: 0 auto; padding: calc(var(--safe-t) + 16px) 16px calc(var(--safe-b) + 110px); }
+.app { position: relative; max-width: 640px; margin: 0 auto; padding: calc(var(--safe-t) + 16px) 16px calc(var(--safe-b) + 124px); }
 .view { animation: enter 0.22s var(--ease) backwards; }
 @keyframes enter { from { opacity: 0; transform: translate3d(0, 6px, 0); } to { opacity: 1; transform: none; } }
 
@@ -405,9 +405,11 @@ textarea.input.tall { min-height: 260px; }
 .faceid:active { transform: scale(0.92); }
 
 /* toast */
-.toast { position: fixed; left: 50%; bottom: calc(var(--safe-b) + 84px); z-index: 60; transform: translateX(-50%); background: var(--surface-3); border: 1px solid var(--line-2); border-radius: 999px; padding: 10px 10px 10px 18px; display: flex; align-items: center; gap: 12px; font-size: 14px; box-shadow: var(--shadow); animation: toast 0.35s var(--spring) both; max-width: calc(100vw - 32px); }
+.toast { position: fixed; left: 50%; bottom: calc(var(--safe-b) + 88px); z-index: 60; transform: translateX(-50%); background: rgba(53, 41, 79, 0.92); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid var(--line-2); border-radius: 999px; padding: 10px 18px 10px 14px; display: flex; align-items: center; gap: 12px; font-size: 14px; box-shadow: var(--shadow); animation: toast 0.35s var(--spring) both; max-width: calc(100vw - 32px); }
 .toast span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.toast button { color: var(--orange); font-weight: 700; padding: 6px 10px; flex: none; }
+.toast button { color: var(--orange); font-weight: 700; padding: 6px 10px; margin: -6px -10px -6px 0; flex: none; }
+.toast > svg { color: var(--mint); flex: none; }
+.toast { white-space: nowrap; }
 @keyframes toast { from { opacity: 0; transform: translate(-50%, 16px) scale(0.92); } }
 @media (min-width: 960px) { .toast { bottom: 28px; left: calc(50% + var(--side) / 2); } }
 
@@ -489,6 +491,7 @@ button.tile { text-align: left; font: inherit; cursor: pointer; }
   --shadow: 0 10px 28px -16px rgba(70, 40, 120, 0.35);
   color-scheme: light;
 }
+[data-theme='light'] .toast { background: rgba(255, 255, 255, 0.92); }
 [data-theme='light'] .nav { background: rgba(255, 255, 255, 0.86); box-shadow: 0 16px 40px -16px rgba(70, 40, 120, 0.4); }
 [data-theme='light'] .side { background: rgba(255, 255, 255, 0.75) !important; }
 [data-theme='light'] .glow::before, [data-theme='light'] .glow::after { opacity: 0.14; }
@@ -528,7 +531,12 @@ button.tile { text-align: left; font: inherit; cursor: pointer; }
 .home .hero { position: relative; overflow: hidden; border-radius: 26px; padding: 20px 18px; margin-bottom: 14px; border: 1px solid var(--line-2); background: var(--grad-soft); box-shadow: var(--shadow); }
 .home .hero.morning { background: linear-gradient(140deg, rgba(255, 192, 138, 0.3), rgba(255, 140, 200, 0.16) 60%, rgba(169, 139, 255, 0.14)); }
 .home .hero.night { background: linear-gradient(140deg, rgba(169, 139, 255, 0.3), rgba(143, 196, 255, 0.14) 60%, rgba(255, 140, 200, 0.1)); }
-.home .hero a.h-main { display: flex; align-items: center; gap: 14px; color: inherit; text-decoration: none; }
+.home .hero { display: flex; align-items: center; gap: 14px; color: var(--text); text-decoration: none; transition: transform 0.16s var(--spring); }
+.home .hero:active { transform: scale(0.985); }
+.home .hero > svg { color: var(--faint); flex: none; }
+.home .hero .grow { display: flex; flex-direction: column; }
+.home .hero h2 { font-size: 21px; font-weight: 700; margin: 3px 0 2px; line-height: 1.2; }
+.home .hero .h-s { font-size: 14px; font-weight: 400; color: var(--muted); margin: 0; }
 .h-orb { width: 54px; height: 54px; border-radius: 50%; flex: none; display: grid; place-items: center; background: var(--grad); color: #1d1330; animation: pulse 2.8s ease-in-out infinite; }
 .hero.night .h-orb { background: var(--grad-3); }
 .h-k { font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--muted); }
