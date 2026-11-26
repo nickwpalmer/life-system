@@ -42,7 +42,7 @@ export function SchoolPanel() {
 
   // Canvas assignments (not lesson pages) for the next three weeks.
   const canvas: Due[] = events.filter((e) => e.calendar_name === 'Canvas' && !/^lesson\b/i.test(e.title))
-    .map((e) => { const m = e.title.match(/\[([A-Z]+)_?(\d+)?\]\s*$/); return { key: e.id, day: localDay(e.starts_at, e.all_day), title: e.title.replace(/\s*\[[^\]]+\]\s*$/, '').replace(/^HW \| /, 'HW ').trim(), course: m ? `${m[1]}${m[2] ? ' ' + m[2] : ''}` : null, kind: (/test|exam|quiz|final/i.test(e.title) ? 'exam' : 'deadline') as Due['kind'], from: 'canvas' as const } })
+    .map((e) => { const m = e.title.match(/\[([A-Z]+)_?(\d+)?[^\]]*\]\s*$/); return { key: e.id, day: localDay(e.starts_at, e.all_day), title: e.title.replace(/\s*\[[^\]]+\]\s*$/, '').replace(/^HW \| /, 'HW ').trim(), course: m ? `${m[1]}${m[2] ? ' ' + m[2] : ''}` : null, kind: (/test|exam|quiz|final/i.test(e.title) ? 'exam' : 'deadline') as Due['kind'], from: 'canvas' as const } })
     .filter((d) => d.day >= t && daysUntil(d.day) <= 21)
   // Your school tasks are the to-dos. Key dates are only the dates that aren't tasks (exams, term dates).
   const eduId = useStore((s) => s.areas.find((a) => a.key === 'education')?.id)
@@ -56,7 +56,9 @@ export function SchoolPanel() {
   const same = (m: Due, c: Due) => (!m.course || !c.course || m.course === c.course) && overlaps(m.title, c.title) && Math.abs(daysUntil(m.day) - daysUntil(c.day)) <= 14
   const canvasLeft: Due[] = []
   for (const c of canvas) {
-    const m = mine.find((x) => same(x, c))
+    // Best match: same course first, then the most words in common, then the closest date.
+    const score = (x: Due) => (x.course && x.course === c.course ? 100 : 0) + [...words(x.title)].filter((w) => words(c.title).has(w)).length * 10 - Math.abs(daysUntil(x.day) - daysUntil(c.day))
+    const m = mine.filter((x) => same(x, c)).sort((a, b) => score(b) - score(a))[0]
     if (!m) { canvasLeft.push(c); continue }
     if (m.day === c.day) m.onCanvas = true
     else m.canvasDay = c.day
