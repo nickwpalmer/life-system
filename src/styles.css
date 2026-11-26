@@ -920,3 +920,4 @@ a.src:active { transform: scale(0.98); }
 .passed-row { padding: 12px; border-radius: 16px; background: var(--surface); border: 1px solid var(--line); transition: opacity 0.25s; }
 .passed-row.handled { opacity: 0.55; }
 .passed-t { font-weight: 560; overflow-wrap: anywhere; }
+.input.passed-date { width: auto; height: 34px; min-height: 0; padding: 0 12px; font-size: 14px; border-radius: 999px; }

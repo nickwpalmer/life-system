@@ -2,9 +2,9 @@
 
 const path = () => location.hash.replace(/^#\/?/, '') || 'today'
 const stack: string[] = [path()]
-let tabs = ['today']
+let tabs = ['today', 'more']
 
-export const setTabs = (t: string[]) => { tabs = ['today', ...t] }
+export const setTabs = (t: string[]) => { tabs = ['today', ...t, 'more'] }
 export const isTabRoot = (p = path()) => tabs.includes(p)
 
 /** Called on every route change. */

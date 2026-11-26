@@ -146,14 +146,14 @@ function PassedStep({ ids }: { ids: string[] }) {
         return (
           <div class={`passed-row ${h ? 'handled' : ''}`}>
             <div class="row between" style="gap:10px;align-items:flex-start">
-              <div style="min-width:0"><div class="passed-t">{t.title}</div><div class="faint tiny">Was {fmtDay(passedDate(t) ?? today())}</div></div>
+              <div style="min-width:0"><div class="passed-t">{t.title}</div><div class="faint tiny">Due {fmtDay(passedDate(t) ?? today()).replace(/^(Yesterday|Today)$/, (w) => w.toLowerCase())}</div></div>
               {h && <span class="pill" style="--c:var(--mint)">{h}</span>}
             </div>
             {!h && <div class="chips" style="margin-top:8px">{isStalePrep(t) ? [btns[2], btns[0], btns[1]] : btns}</div>}
             {!h && moving === t.id && <div class="chips" style="margin-top:8px">
               <button class="chip" onClick={() => move(t, inDays(1))}>Tomorrow</button>
               <button class="chip" onClick={() => move(t, inDays(7))}>Next week</button>
-              <input class="input" type="date" style="width:auto;height:34px;padding:4px 10px" min={inDays(1)} onChange={(e) => move(t, (e.target as HTMLInputElement).value)} />
+              <input class="input passed-date" type="date" aria-label="Pick a date" min={inDays(1)} onChange={(e) => move(t, (e.target as HTMLInputElement).value)} />
             </div>}
           </div>
         )

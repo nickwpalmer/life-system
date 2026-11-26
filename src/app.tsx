@@ -132,7 +132,7 @@ export const NAV: NavItem[] = [
   { r: 'people', icon: 'users', label: 'People', c: 'var(--coral)', group: 'ref', sub: 'Birthdays, keeping in touch' },
   { r: 'records', icon: 'layers', label: 'Documents', c: 'var(--peach)', group: 'ref', sub: 'IDs, insurance, certifications' },
   { r: 'things', icon: 'car', label: 'Your things', c: 'var(--sky)', group: 'ref', sub: 'Car, apartment, inventories' },
-  { r: 'notes', icon: 'note', label: 'Notes', c: 'var(--gold)', group: 'ref', sub: 'Lists, how-tos, ideas' },
+  { r: 'notes', icon: 'note', label: 'Notes', c: 'var(--gold)', group: 'ref', sub: 'Lists, how-tos, cited facts, ideas' },
   { r: 'changes', icon: 'history', label: 'Claude’s changes', c: 'var(--violet)', group: 'system', sub: 'See, undo, leave Claude a note' },
   { r: 'settings', icon: 'gear', label: 'Settings', c: 'var(--muted)', group: 'system', sub: 'Preferences and connections' },
   { r: 'help', icon: 'help', label: 'Help', c: 'var(--sky)', group: 'system', sub: 'How things work' },
@@ -204,6 +204,7 @@ export function App() {
   const loaded = useStore((s) => s.loaded)
   const route = useRoute()
   const [resetN, setResetN] = useState(0)
+  setTabs(usePrefs().tabs)
   useEffect(() => onTabReset(() => setResetN((n) => n + 1)), [])
   useShortcuts()
   const { theme, logo } = usePrefs()
