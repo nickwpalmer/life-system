@@ -254,6 +254,7 @@ export function Settings() {
   return (
     <>
       <PageHead title="Settings" back="#/more" icon="gear" color="var(--muted)" />
+      <SyncStatus />
       <AboutYou />
       <Appearance />
       <TabPicker />
@@ -268,7 +269,6 @@ export function Settings() {
         ))}
       </section>
 
-      <SyncStatus />
       <Connections />
 
       <a class="card prompt" href="#/help" style="--accent:var(--sky)"><span class="orb"><Icon name="help" size={20} /></span><span class="grow"><h3>Help</h3><p class="muted small">The ring, updates, undoing a check-in</p></span><Icon name="chev" /></a>

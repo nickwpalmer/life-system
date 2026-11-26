@@ -65,12 +65,13 @@ export function Insights({ hub }: { hub?: Hub }) {
 
   return (
     <>
-      <PageHead hub={hub} sub={hub ? 'What goes with what, and how the weeks add up' : undefined} title="Insights" icon="chart" color="var(--teal)" action={<div class="chips">{[7, 30, 90].map((n) => <button class={`chip ${range === n ? 'on' : ''}`} style="height:30px" onClick={() => setRange(n)}>{n}d</button>)}</div>} />
+      <PageHead hub={hub} title="Insights" icon="chart" color="var(--teal)" />
+      <div class="row between" style="margin:-4px 2px 12px"><span class="muted small">What goes with what</span><div class="chips" style="flex-wrap:nowrap">{[7, 30, 90].map((n) => <button class={`chip ${range === n ? 'on' : ''}`} style="height:30px" onClick={() => setRange(n)}>{n} days</button>)}</div></div>
       <div class="stat-row four">
         <div class="stat" style="--c:var(--pink)"><div class="s-val">{avg(mood)?.toFixed(1) ?? '–'}</div><div class="s-lbl">avg mood</div></div>
         <div class="stat" style="--c:var(--sky)"><div class="s-val">{avg(sleep)?.toFixed(1) ?? '–'}</div><div class="s-lbl">avg sleep (h)</div></div>
         <div class="stat" style="--c:var(--orange)"><div class="s-val">{ciRate}</div><div class="s-lbl">days checked in</div></div>
-        <div class="stat desk-only" style="--c:var(--violet)"><div class="s-val">{avg(energy)?.toFixed(1) ?? '–'}</div><div class="s-lbl">avg energy</div></div>
+        <div class="stat" style="--c:var(--violet)"><div class="s-val">{avg(energy)?.toFixed(1) ?? '–'}</div><div class="s-lbl">avg energy</div></div>
       </div>
       {!anyData && <div class="card soft"><p class="small">Charts fill in as you log. A week of nightly logs is enough for the first patterns.</p></div>}
       <div class="grid-2">

@@ -29,7 +29,7 @@ export function SyncStatus() {
   const all = async () => { setBusy('all'); await syncAll().catch(() => {}); await load(); setBusy(null) }
   const ring = async () => { setBusy('ring'); const [, line] = await syncRing().catch(() => ['fail', 'Couldn’t reach the ring sync'] as const); toast(line); await load(); setBusy(null) }
   const behind = t?.ringDay ? daysBetween(t.ringDay, today()) : null
-  const pulled = lastLoadedAt()
+  const pulled = lastLoadedAt() || (demo ? Date.now() : 0)
   const row = (name: string, icon: string, state: 'ok' | 'warn' | 'off', last: string | null, how: string, btn?: preact.ComponentChildren) => (
     <div class="srow">
       <span class="m-ico"><Icon name={icon} size={18} /></span>

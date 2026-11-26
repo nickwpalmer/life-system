@@ -127,7 +127,7 @@ export function AreaView({ areaKey, hub }: { areaKey: string; hub?: Hub }) {
   if (!a) return <p class="empty">That area doesn’t exist.</p>
   const open = tasks.filter((t) => openTask(t) && t.area_id === a.id)
   const gs = goals.filter((g) => g.area_id === a.id && g.status === 'active' && !g.suggested)
-  const ms = metrics.filter((m) => m.active && m.area_id === a.id && !(a.key === 'finances' && m.key === 'spend') && !(a.key === 'mental' && ['mood', 'anxiety'].includes(m.key)) && !(hub && m.role === 'habit'))
+  const ms = metrics.filter((m) => m.active && m.area_id === a.id && !(a.key === 'finances' && m.key === 'spend') && !(a.key === 'mental' && ['mood', 'anxiety'].includes(m.key)) && !(hub && m.role === 'habit') && !(hub && ['sleep_score', 'hrv', 'resting_hr'].includes(m.key)))
   const doneWeek = tasks.filter((t) => t.area_id === a.id && t.status === 'done' && t.completed_at && Date.now() - new Date(t.completed_at).getTime() < 7 * 864e5).length
   return (
     <div style={`--accent:${a.color}`}>

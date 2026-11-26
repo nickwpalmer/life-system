@@ -29,7 +29,7 @@ export function useKeyDates() {
 
 const STOP = new Set(['assignment', 'homework', 'project', 'submission', 'submit', 'discussion', 'module', 'final', 'chapter', 'section', 'reading', 'review', 'class', 'due'])
 const words = (s: string) => new Set((s.toLowerCase().match(/[a-z]{5,}/g) ?? []).filter((w) => !STOP.has(w)))
-const courseOf = (s: string) => { const m = s.match(/\b([A-Z]{2,4})[ _]?(\d{3,4})\b/); return m ? `${m[1]} ${m[2]}` : null }
+const courseOf = (s: string) => { const m = s.match(/\b([A-Z]{2,4})[ _-]?(\d{3,4})\b/); return m ? `${m[1]} ${m[2]}` : null }
 const overlaps = (a: string, b: string) => { const w = words(b); return [...words(a)].some((x) => w.has(x)) }
 const localDay = (iso: string, allDay: boolean) => allDay ? iso.slice(0, 10) : dayKey(new Date(iso))
 const clock = (iso: string) => new Date(iso).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
