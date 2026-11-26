@@ -106,6 +106,7 @@ export function AssetPage({ ref_ }: { ref_: string }) {
           {missing.map(([n, c, renews]) => <button class="chip small" onClick={() => setEditRec({ name: n, category: c, renews, asset_id: a.id, issuer: '', details: '', location: '', link: '', login_hint: '', expires_on: null, notes: '', pinned: false })}>+ {n}</button>)}
           <button class="chip small" onClick={() => setEditRec({ name: '', category: a.kind === 'home' ? 'housing' : a.kind === 'vehicle' ? 'vehicle' : 'other', asset_id: a.id, issuer: '', details: '', location: '', link: '', login_hint: '', expires_on: null, renews: false, notes: '', pinned: false })}>+ Other</button>
         </div>
+        {a.kind === 'vehicle' && missing.some(([n]) => n === 'Registration') && <p class="faint small" style="margin-top:10px">Add your registration with its expiry date (and your driver’s license under Documents) so the app warns you before they run out.</p>}
       </Card>
 
       <Card title="To do" icon="tasks" accent={k.c}>

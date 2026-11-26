@@ -33,6 +33,8 @@ import { Changes } from './views/Changes'
 import { Help } from './views/Help'
 import { usePrefs, logoUrl, applyTheme, applyLogo } from './lib/prefs'
 import { syncAll } from './lib/sync'
+import { track, setTabs, tabTap, onTabReset, installEdgeSwipe } from './lib/nav'
+import { installHaptics } from './lib/haptics'
 
 /** Pull down at the top of any screen to sync. The panel shows each source as it checks in. */
 function PullToSync() {
@@ -100,7 +102,7 @@ function useRoute() {
   const get = () => location.hash.replace(/^#\/?/, '') || 'today'
   const [route, setRoute] = useState(get())
   useEffect(() => {
-    const f = () => { setRoute(get()); window.scrollTo({ top: 0 }) }
+    const f = () => { const r = get(); track(r); setRoute(r); window.scrollTo({ top: 0 }) }
     addEventListener('hashchange', f)
     return () => removeEventListener('hashchange', f)
   }, [])
@@ -167,15 +169,16 @@ function TabBar({ base }: { base: string }) {
   const inbox = useStore((s) => s.tasks.some((t) => t.status === 'inbox'))
   const prefs = usePrefs()
   const tabs = [navItem('today')!, ...prefs.tabs.map(navItem).filter((n): n is NavItem => !!n)]
+  setTabs(prefs.tabs)
   const onTab = tabs.some((t) => t.r === base)
   return (
     <nav class="nav" aria-label="Main">
       {tabs.map((n) => (
-        <a href={`#/${n.r}`} class={base === n.r ? 'on' : ''} style={`--c:${n.c}`} aria-label={n.label}>
+        <a href={`#/${n.r}`} class={base === n.r ? 'on' : ''} style={`--c:${n.c}`} aria-label={n.label} onClick={(e) => tabTap(n.r, e)}>
           <Icon name={n.icon} />{n.r === 'tasks' && inbox && <i class="nb" />}
         </a>
       ))}
-      <a href="#/more" class={!onTab ? 'on' : ''} style="--c:var(--lilac)" aria-label="Everything"><Icon name="grid" /></a>
+      <a href="#/more" class={!onTab ? 'on' : ''} style="--c:var(--lilac)" aria-label="Everything" onClick={(e) => tabTap('more', e)}><Icon name="grid" /></a>
     </nav>
   )
 }
@@ -200,6 +203,8 @@ export function App() {
   const ready = useStore((s) => s.ready)
   const loaded = useStore((s) => s.loaded)
   const route = useRoute()
+  const [resetN, setResetN] = useState(0)
+  useEffect(() => onTabReset(() => setResetN((n) => n + 1)), [])
   useShortcuts()
   const { theme, logo } = usePrefs()
   // Prefs live on your profile, so a change on the phone shows up on the Mac too.
@@ -218,6 +223,8 @@ export function App() {
     }
     installIdleLock()
     installRefresh()
+    installHaptics()
+    installEdgeSwipe()
     supabase.auth.getSession().then(({ data }) => {
       setState({ session: data.session, ready: true })
       if (data.session) bootstrap(true).catch(() => setState({ loaded: true }))
@@ -273,7 +280,7 @@ export function App() {
       {isDemo && <span class="demo-banner">Demo data</span>}
       <div class="shell">
         <Sidebar base={base} />
-        <main class="app"><div class="view" key={path}>{view}</div></main>
+        <main class="app"><div class="view" key={`${path}#${resetN}`}>{view}</div></main>
       </div>
       {base !== 'checkin' && <Fab />}
       <TabBar base={base} />

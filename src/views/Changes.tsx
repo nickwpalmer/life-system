@@ -51,8 +51,8 @@ export function Changes() {
   const [note, setNote] = useState('')
   const [open, setOpen] = useState<Record<number, boolean>>({})
 
-  async function undo(c: Change) {
-    setBusy(c.id)
+  /** Undoes one change and leaves Claude a note. Returns whether it worked here. */
+  async function undoOne(c: Change): Promise<boolean> {
     let ok = true, why = ''
     if (!getState().demo) {
       const { error } = await supabase.rpc('revert_change', { p_id: c.id })
@@ -62,14 +62,24 @@ export function Changes() {
     const what = `${opOf(c)[0]} ${TABLE[c.table_name] ?? c.table_name}: ${label(c)}`
     await addRow('claude_inbox', {
       kind: 'undo', change_id: c.id, status: ok ? 'done' : 'open',
-      body: ok ? `Nick undid this. Don’t redo it unless he asks. (${what})` : `Nick asked to undo this, but the app couldn’t (${why}). Please undo it. (${what})`,
+      body: ok ? `The owner undid this. Don’t redo it unless they ask. (${what})` : `The owner asked to undo this, but the app couldn’t (${why}). Please undo it. (${what})`,
       done_at: ok ? new Date().toISOString() : null,
     }).catch(() => {})
-    if (!getState().demo) {
-      await Promise.all([loadRows('change_log', true), bootstrap(true)])
-      if (ROW_TABLES.includes(c.table_name)) loadRows(c.table_name as never, true)
-    }
-    toast(ok ? 'Undone. Claude will know not to redo it.' : 'Couldn’t undo here, so Claude will do it next time.')
+    return ok
+  }
+  async function reload(items: Change[]) {
+    if (getState().demo) return
+    await Promise.all([loadRows('change_log', true), bootstrap(true)])
+    for (const t of new Set(items.map((c) => c.table_name))) if (ROW_TABLES.includes(t)) loadRows(t as never, true)
+  }
+  async function undo(items: Change[]) {
+    const todo = items.filter((c) => !c.reverted_at)
+    if (!todo.length) return
+    setBusy(todo[0].id)
+    let ok = 0
+    for (const c of todo) if (await undoOne(c)) ok++ // newest first, so each undo sees the row as the next one left it
+    await reload(todo)
+    toast(ok === todo.length ? (todo.length > 1 ? `Undid all ${todo.length}. Claude will know not to redo them.` : 'Undone. Claude will know not to redo it.') : 'Couldn’t undo some of it here, so Claude will finish next time.')
     setBusy(null)
   }
 
@@ -83,11 +93,12 @@ export function Changes() {
 
   const head = <PageHead title="Claude’s changes" sub="What Claude edited, and notes for Claude" back="#/more" icon="history" color="var(--lilac)" />
   if (rows === null) return <>{head}<div class="skeleton" /></>
-  // One group per batch: same note, written within a few minutes of each other.
+  // One group per batch: same note, written within a few minutes of the batch's first change.
   const groups: { note: string; at: string; items: Change[] }[] = []
   for (const c of rows) {
-    const g = groups[groups.length - 1]
-    if (g && g.note === (c.note ?? '') && Math.abs(new Date(g.items[g.items.length - 1].at).getTime() - new Date(c.at).getTime()) < 10 * 60e3) g.items.push(c)
+    const t = new Date(c.at).getTime()
+    const g = groups.find((x) => x.note === (c.note ?? '') && Math.abs(new Date(x.items[x.items.length - 1].at).getTime() - t) < 10 * 60e3)
+    if (g) g.items.push(c)
     else groups.push({ note: c.note ?? '', at: c.at, items: [c] })
   }
   const pending = inbox.filter((m) => m.status === 'open')
@@ -106,7 +117,7 @@ export function Changes() {
       {groups.slice(0, 40).map((g, gi) => {
         const shown = open[gi] ? g.items : g.items.slice(0, 6)
         return (
-          <Card title={g.note || 'Changes'} action={<span class="faint small">{relTime(g.at)}</span>}>
+          <Card title={g.note || 'Changes'} action={<span class="row" style="gap:8px"><span class="faint small">{relTime(g.at)}</span>{g.items.filter((c) => !c.reverted_at).length > 1 && <button class="btn sm" disabled={busy !== null} onClick={() => undo(g.items)}>Undo all</button>}</span>}>
             {shown.map((c) => {
               const d = diff(c)
               const [verb, color] = opOf(c)
@@ -114,7 +125,7 @@ export function Changes() {
                 <div class={`chg ${c.reverted_at ? 'undone' : ''}`}>
                   <span class="pill" style={`--c:${color}`}>{verb}</span>
                   <span class="grow" style="min-width:0"><div class="ellipsis">{label(c)}</div><div class="faint tiny ellipsis">{TABLE[c.table_name] ?? c.table_name}{d.length ? ` · ${d.slice(0, 3).join(', ').replace(/_/g, ' ')}` : ''}{c.reverted_at ? ' · undone' : ''}</div></span>
-                  {!c.reverted_at && <button class="btn sm ghost" disabled={busy !== null} onClick={() => undo(c)}>{busy === c.id ? '…' : 'Undo'}</button>}
+                  {!c.reverted_at && <button class="btn sm ghost" disabled={busy !== null} onClick={() => undo([c])}>{busy === c.id ? '…' : 'Undo'}</button>}
                 </div>
               )
             })}

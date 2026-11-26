@@ -1,4 +1,4 @@
-// All "days" are the device's local calendar day (Nick's phone runs on Detroit time).
+// All "days" are the device's local calendar day (the owner's phone sets the time zone).
 
 export const pad = (n: number) => String(n).padStart(2, '0')
 

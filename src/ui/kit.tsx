@@ -3,6 +3,8 @@ import type { ComponentChildren } from 'preact'
 import { useEffect, useState, useRef } from 'preact/hooks'
 import { useStore, setState } from '../lib/store'
 import { Icon } from './icons'
+import { goBack, isTabRoot, parentOf } from '../lib/nav'
+import { haptic } from '../lib/haptics'
 
 /** Bottom sheet on phones, centered card on wide screens. Esc closes. */
 export function Sheet({ open, onClose, children, title, wide }: { open: boolean; onClose: () => void; children: ComponentChildren; title?: string; wide?: boolean }) {
@@ -108,7 +110,7 @@ export function Toast() {
 
 export function Spinner() { return <div class="row" style="justify-content:center;padding:30px"><div class="spinner" /></div> }
 
-export function haptic() { try { navigator.vibrate?.(8) } catch { /* iOS ignores */ } }
+export { haptic }
 
 /** Tiny celebratory burst from an element. */
 export function burst(el: Element | null, n = 14) {
@@ -142,12 +144,12 @@ export function ListInputs({ values, onChange, placeholder, count = 3 }: { value
   )
 }
 
-/** Page header. On phones a back arrow shows when `back` is set; the sidebar handles it on desktop. */
+/** Page header. On phones a back arrow shows on every page that isn't a bottom-bar tab; it goes back the way you came. The sidebar handles it on desktop. */
 export function PageHead({ title, sub, back, action, icon, color }: { title: ComponentChildren; sub?: ComponentChildren; back?: string; action?: ComponentChildren; icon?: string; color?: string }) {
   return (
     <div class="page-title">
       <div class="row" style="min-width:0">
-        {back && <a class="icon-btn back" href={back} aria-label="Back"><Icon name="back" size={20} /></a>}
+        {(back || !isTabRoot()) && <a class="icon-btn back" href={parentOf(undefined, back)} aria-label="Back" onClick={(e) => { e.preventDefault(); goBack(back) }}><Icon name="back" size={20} /></a>}
         {icon && <span class="title-ico" style={color ? `--c:${color}` : ''}><Icon name={icon} size={20} /></span>}
         <div style="min-width:0"><h1>{title}</h1>{sub && <p class="muted small">{sub}</p>}</div>
       </div>

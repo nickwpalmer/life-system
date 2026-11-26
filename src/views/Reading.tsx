@@ -13,10 +13,10 @@ export type Book = {
 const STATUS: [Book['status'], string][] = [['reading', 'Reading'], ['to_read', 'Up next'], ['paused', 'Paused'], ['done', 'Finished']]
 
 registerDemo('books', () => [
-  { id: 'b1', title: '1984', author: 'George Orwell', status: 'reading', pages: 328, current_page: 142, cover_url: null, started_on: null, finished_on: null, notes: null, sort: 1 },
-  { id: 'b2', title: 'Racism Without Racists', author: 'Eduardo Bonilla-Silva', status: 'reading', pages: 384, current_page: 60, cover_url: null, started_on: null, finished_on: null, notes: null, sort: 2 },
-  { id: 'b3', title: 'Medicare for All', author: 'Abdul El-Sayed', status: 'to_read', pages: null, current_page: null, cover_url: null, started_on: null, finished_on: null, notes: null, sort: 3 },
-  { id: 'b4', title: 'The Hitchhiker’s Guide to the Galaxy', author: 'Douglas Adams', status: 'to_read', pages: null, current_page: null, cover_url: null, started_on: null, finished_on: null, notes: null, sort: 4 },
+  { id: 'b1', title: 'Frankenstein', author: 'Mary Shelley', status: 'reading', pages: 280, current_page: 112, cover_url: null, started_on: null, finished_on: null, notes: null, sort: 1 },
+  { id: 'b2', title: 'Walden', author: 'Henry David Thoreau', status: 'reading', pages: 352, current_page: 40, cover_url: null, started_on: null, finished_on: null, notes: null, sort: 2 },
+  { id: 'b3', title: 'The Odyssey', author: 'Homer', status: 'to_read', pages: null, current_page: null, cover_url: null, started_on: null, finished_on: null, notes: null, sort: 3 },
+  { id: 'b4', title: 'Pride and Prejudice', author: 'Jane Austen', status: 'to_read', pages: null, current_page: null, cover_url: null, started_on: null, finished_on: null, notes: null, sort: 4 },
 ] as never)
 
 const pct = (b: Book) => b.status === 'done' ? 1 : b.pages && b.current_page ? Math.min(1, b.current_page / b.pages) : 0

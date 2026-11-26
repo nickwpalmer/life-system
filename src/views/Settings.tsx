@@ -10,9 +10,10 @@ import { Icon } from '../ui/icons'
 import { Sheet, Switch, PageHead } from '../ui/kit'
 import { syncAll, syncRing, sourceTimes } from '../lib/sync'
 import { usePrefs, savePrefs, LOGOS, logoUrl } from '../lib/prefs'
+import { haptic, hapticsOn, setHaptics } from '../lib/haptics'
 import { relTime, fmtShort, daysBetween, today } from '../lib/dates'
 
-export const VERSION = 'v0.5.1'
+export const VERSION = 'v0.6'
 import { NAV } from '../app'
 
 type Passkey = { id: string; friendly_name?: string; created_at: string; last_used_at?: string }
@@ -111,6 +112,7 @@ function AreaEditor({ open, area, onClose }: { open: boolean; area: Area | null;
 
 function Appearance() {
   const p = usePrefs()
+  const [hap, setHap] = useState(hapticsOn())
   return (
     <section class="card">
       <div class="card-h"><h2>Look</h2></div>
@@ -121,6 +123,7 @@ function Appearance() {
         <div class="logos">{LOGOS.map((l) => <button class={p.logo === l.key ? 'on' : ''} onClick={() => savePrefs({ logo: l.key })} aria-label={l.name}><img src={logoUrl(l.key)} alt="" /><span>{l.name}</span></button>)}</div>
       </div>
       <p class="faint small">A new icon shows on your Home Screen once you remove Life from it and add it again from Safari. Your data stays put.</p>
+      <div class="row between" style="margin:14px 2px 0"><span>Tap feel (haptics)<br /><small class="faint">On iPhone this needs iOS 18 or later</small></span><Switch label="Haptics" on={hap} onChange={(v) => { setHaptics(v); setHap(v); if (v) haptic('success') }} /></div>
     </section>
   )
 }

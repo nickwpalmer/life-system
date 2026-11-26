@@ -89,7 +89,7 @@ export function TaskRow({ t, onOpen, process }: { t: Task; onOpen: (t: Task) => 
 
 export function TaskSheet({ task, onClose }: { task: Task | null; onClose: () => void }) {
   const areas = useStore((s) => s.areas.filter((a) => !a.archived))
-  const goals = useStore((s) => s.goals.filter((g) => g.status === 'active' && !g.suggested))
+  const goals = useStore((s) => s.goals.filter((g) => g.status === 'active'))
   const [f, setF] = useState<Partial<Task>>({})
   useEffect(() => { if (task) setF({ ...task }) }, [task?.id])
   if (!task) return <Sheet open={false} onClose={onClose}>{null}</Sheet>
@@ -132,7 +132,7 @@ export function TaskSheet({ task, onClose }: { task: Task | null; onClose: () =>
         {([['inbox', 'Inbox'], ['open', 'To do'], ['doing', 'Doing'], ['waiting', 'Waiting on someone']] as [TaskStatus, string][]).map(([s, l]) => <button class={`chip ${f.status === s ? 'on' : ''}`} onClick={() => setF({ ...f, status: s })}>{l}</button>)}
         <button class={`chip ${someday ? 'on' : ''}`} onClick={() => setF({ ...f, tags: someday ? (f.tags ?? []).filter((x) => x !== 'someday') : [...(f.tags ?? []), 'someday'] })}>Someday</button>
       </div></div>
-      {goals.length > 0 && <div class="field"><span>Moves this goal forward</span><div class="chips">{goals.map((g) => <button class={`chip ${f.goal_id === g.id ? 'on' : ''}`} style="--c:var(--gold)" onClick={() => setF({ ...f, goal_id: f.goal_id === g.id ? null : g.id })}>{g.title}</button>)}</div></div>}
+      {goals.length > 0 && <div class="field"><span>Moves this goal forward</span><div class="chips">{goals.map((g) => <button class={`chip ${f.goal_id === g.id ? 'on' : ''}`} style="--c:var(--gold)" onClick={() => setF({ ...f, goal_id: f.goal_id === g.id ? null : g.id })}>{g.title}{g.suggested && <small class="faint"> · suggested</small>}</button>)}</div></div>}
       <button class="btn primary block" onClick={save}>Save</button>
       <button class="btn ghost danger block" style="margin-top:8px" onClick={del}><Icon name="trash" size={18} /> Delete</button>
     </Sheet>
@@ -292,7 +292,7 @@ function ListTiles() {
 }
 
 /** Tags that work as lists (Shopping, car…): not class codes, not someday. */
-const NOT_LISTS = new Set(['someday', 'personal'])
+const NOT_LISTS = new Set(['someday', 'personal', 'inbox'])
 export const listTags = (tasks: Task[]) => {
   const n = new Map<string, number>()
   for (const t of tasks) if (openTask(t)) for (const g of t.tags ?? []) if (!NOT_LISTS.has(g.toLowerCase()) && !courseOf({ ...t, title: '', tags: [g] })) n.set(g, (n.get(g) ?? 0) + 1)

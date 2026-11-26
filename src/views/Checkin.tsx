@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'preact/hooks'
-import { saveCheckin, setDaily, insert, update, remove, restore } from '../lib/db'
-import { getState, setState, toast, metricByKey } from '../lib/store'
-import { checkinDay, today, dayKey, lastNDays } from '../lib/dates'
+import { saveCheckin, setDaily, insert, update, remove, restore, setTaskDone } from '../lib/db'
+import { getState, setState, toast, metricByKey, useStore } from '../lib/store'
+import { checkinDay, today, dayKey, lastNDays, inDays, fmtDay } from '../lib/dates'
 import { dailySeries } from '../lib/metrics'
 import { useRows } from '../lib/rows'
 import { syncRing } from '../lib/sync'
@@ -111,6 +111,57 @@ function journalText(c: Checkin, sleepH: number | null) {
   return lines.join('\n').trim()
 }
 
+/** Tasks whose date has passed. */
+const passedDate = (t: Task) => { const d = [t.due_date, t.scheduled_for].filter((x): x is string => !!x && x < today()).sort()[0]; return d ?? null }
+export const passedTasks = (tasks: Task[]) => tasks.filter((t) => openTask(t) && t.status !== 'inbox' && !t.recurrence && passedDate(t)).sort((a, b) => passedDate(a)!.localeCompare(passedDate(b)!))
+/** Prep for something that already happened, like "Review for Quiz 9": dropping it is the likely answer. */
+const isStalePrep = (t: Task) => /^(review|study|prep|practice)\b.*\b(quiz|test|exam|midterm|final)\b/i.test(t.title)
+
+/** One decision per passed task: done, a new date, or drop. Drop only marks it dropped (it stays in Done). */
+function PassedStep({ ids }: { ids: string[] }) {
+  const tasks = useStore((s) => s.tasks)
+  const [moving, setMoving] = useState<string | null>(null)
+  const [handled, setHandled] = useState<Record<string, string>>({})
+  const rows = ids.map((id) => tasks.find((t) => t.id === id)).filter((t): t is Task => !!t)
+  const mark = (t: Task, what: string) => setHandled((h) => ({ ...h, [t.id]: what }))
+  async function done(t: Task) { mark(t, 'Done'); await setTaskDone(t.id, true).catch(() => {}) }
+  async function drop(t: Task) {
+    mark(t, 'Dropped')
+    await update('tasks', t.id, { status: 'dropped' }).catch(() => {})
+    toast('Dropped', () => { update('tasks', t.id, { status: t.status }).catch(() => {}); setHandled((h) => { const n = { ...h }; delete n[t.id]; return n }) })
+  }
+  async function move(t: Task, day: string) {
+    if (!day) return
+    setMoving(null); mark(t, fmtDay(day))
+    const patch: Partial<Task> = {}
+    if (t.due_date && t.due_date < today()) patch.due_date = day
+    if (t.scheduled_for && t.scheduled_for < today()) patch.scheduled_for = day
+    await update('tasks', t.id, patch).catch(() => {})
+  }
+  return (
+    <div class="passed">
+      {rows.map((t) => {
+        const h = handled[t.id] ?? (openTask(t) ? null : t.status === 'done' ? 'Done' : 'Dropped')
+        const btns = [<button class="chip" onClick={() => done(t)}>Done</button>, <button class="chip" onClick={() => setMoving(moving === t.id ? null : t.id)}>New date</button>, <button class="chip" onClick={() => drop(t)}>Drop</button>]
+        return (
+          <div class={`passed-row ${h ? 'handled' : ''}`}>
+            <div class="row between" style="gap:10px;align-items:flex-start">
+              <div style="min-width:0"><div class="passed-t">{t.title}</div><div class="faint tiny">Was {fmtDay(passedDate(t) ?? today())}</div></div>
+              {h && <span class="pill" style="--c:var(--mint)">{h}</span>}
+            </div>
+            {!h && <div class="chips" style="margin-top:8px">{isStalePrep(t) ? [btns[2], btns[0], btns[1]] : btns}</div>}
+            {!h && moving === t.id && <div class="chips" style="margin-top:8px">
+              <button class="chip" onClick={() => move(t, inDays(1))}>Tomorrow</button>
+              <button class="chip" onClick={() => move(t, inDays(7))}>Next week</button>
+              <input class="input" type="date" style="width:auto;height:34px;padding:4px 10px" min={inDays(1)} onChange={(e) => move(t, (e.target as HTMLInputElement).value)} />
+            </div>}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 /** Morning and night check-ins: one question at a time, leave whenever you want (what you answered is kept). */
 export function CheckinView({ kind }: { kind: 'morning' | 'night' }) {
   const day = checkinDay(kind)
@@ -198,6 +249,7 @@ export function CheckinView({ kind }: { kind: 'morning' | 'night' }) {
       </> },
     { key: 'grateful', q: 'One thing you’re grateful for', body: () => <ListInputs values={c.gratitude} onChange={(v) => set({ gratitude: v })} placeholder="Thing" count={1} /> },
   ]
+  const [passedIds] = useState(() => passedTasks(getState().tasks).map((t) => t.id))
   const night: Step[] = [
     scale('mood', 'How was today, overall?'),
     scale('energy', 'Energy by the end?', 'Drained', 'Charged', 'cool'),
@@ -209,6 +261,7 @@ export function CheckinView({ kind }: { kind: 'morning' | 'night' }) {
     { key: 'grateful', q: 'Grateful for', body: () => <ListInputs values={c.gratitude} onChange={(v) => set({ gratitude: v })} placeholder="Thing" count={3} /> },
     { key: 'mind', q: 'Anything on your mind?', hint: 'Optional. Write as much or as little as you want.',
       body: () => <textarea class="input" style="min-height:120px" value={c.reflection ?? ''} onInput={(e) => set({ reflection: (e.target as HTMLTextAreaElement).value || null })} /> },
+    ...(passedIds.length ? [{ key: 'passed', q: passedIds.length === 1 ? 'This one’s date passed' : `These ${passedIds.length} passed`, hint: 'Done, a new date, or drop? One tap each, or skip.', body: () => <PassedStep ids={passedIds} /> }] : []),
     { key: 'tomorrow', q: 'Most important thing tomorrow', body: (next) => <input class="input big" value={(c.data.tomorrow as string) ?? ''} onInput={(e) => setData('tomorrow', (e.target as HTMLInputElement).value || null)} onKeyDown={(e) => { if (e.key === 'Enter') next() }} /> },
   ]
 

@@ -41,9 +41,9 @@ select id, kind, change_id, body, created_at from claude_inbox where status = 'o
 | Something taken (coffee, a drink, a supplement) | `substance_logs` | `substance`, `amount`, `unit`, `occurred_at`; `time_known=false` if no time given (use local noon). See Substances. |
 | A document or ID-type fact (insurance, registration, W-2) | `records` | See Records. If it belongs to the car or the apartment, set `asset_id` (see Assets). |
 | Anything about the car or the apartment (a repair, a to-do, a document) | `assets` + related tables | See Assets. |
-| A reference note, list or how-to | `notes` | `title`, `body`. An idea gets `tags = '{idea}'` and shows under Notes > Ideas. |
-| A book they're reading or want to | `books` | `title`, `author`, `status` in reading, next, paused, done, `page`, `pages`, `cover_url`, `notes`, `sort`. Update `page` when they say where they are. |
-| A person, birthday, keep-in-touch | `people` | `name`, `relation`, `org`, `phone`, `email`, `birthday`, `contact_every_days`, `last_contact`, `notes`. Names in task titles link to the person's card, so use the same spelling. |
+| A reference note, list or how-to | `notes` | `title`, `body`. An idea gets `tags = '{idea}'` and shows under Notes > Ideas. Facts from research get `tags` including `knowledge` and must be cited (see Notes and citations below). |
+| A book they're reading or want to | `books` | `title`, `author`, `status` in reading, to_read (shows as Up next), paused, done, `page`, `pages`, `cover_url`, `notes`, `sort`. Update `page` when they say where they are. |
+| A person, birthday, keep-in-touch | `people` | `name`, `relation`, `org`, `phone`, `email`, `birthday`, `contact_every_days`, `last_contact`, `notes`. `birthday` is `YYYY-MM-DD`, or `MM-DD` when the year isn't known. |
 | An outcome they want | `goals` | `status='active'`; if you're proposing it rather than they stated it, `suggested=true`. |
 | A school deadline, exam or term date | `key_dates` | `kind` in deadline, exam, term, event; `area_key='education'`; `course` like `MAT 2010`. |
 | A class taken, grade, transfer credit | `edu_courses` / `courses` / `degree_reqs` | History, current or planned classes, degree plan. |
@@ -115,9 +115,9 @@ Each asset has one page in the app (Records, top of the page) that pulls togethe
 - A course's weights live in `courses.data.grading`: a list of `{cat, weight, rule?, pass?, maxMissing?, drop?, completion?, cap?}`. `rule: 'complete'` means the category counts incompletes (an item scoring under `pass`% or marked missing) and is all-or-nothing past `maxMissing`. `drop: N` drops the lowest N. `completion: true` means a turned-in item (`done`) earns full points. `cap: {below, letter}` notes a floor like "under 50% on the final caps the class at D+". Keep any existing keys in `data` when you change it.
 - Optional `courses.data.cutoffs` is a list of `[letter, min%]`, highest first (default A 93, A- 90, B+ 87 and so on). `courses.data.plan` is the class's catch-up plan: `## Section` lines and `- [ ] step` lines, worked top down. Tick steps (`- [x]`) when the owner says they're done.
 - Every point counts in the math, so give each item its real `possible`. Big runs of finished work can be one summary row (for example "Lessons 1 to 32", 32/32). An exam or quiz that's taken but not graded is `done` with a `guess`; replace the guess with `score` when it's graded.
-- When the owner tells you a score, update that item's `score`/`possible` and set `status='graded'`. When Canvas and another source disagree on a date, the app follows Canvas unless the owner says otherwise; note the other date in `note`.
+- When the owner tells you a score, update that item's `score`/`possible` and set `status='graded'`. When Canvas and another source disagree on a date, the app follows Canvas unless the owner says otherwise; note the other date in `note`. Exception: for calculus homework, WebAssign is the source of truth (the owner's rule, Nov 24), so keep WebAssign's date even when Canvas shows another.
 - Homework past its due date with `status='todo'` shows as "unsure" and counts toward the incomplete risk, so mark homework `graded`, `done` or `missing` as soon as you know.
-- A task can hold a checklist in `notes`, one step per line as `- [ ] step` or `- [x] step`. The app shows these as tappable boxes. Don't create sub-tasks with `parent_id`; the app doesn't show them.
+- A task can hold a checklist in `notes`, one step per line as `- [ ] step` or `- [x] step`. The app shows these as tappable boxes. Steps that need their own date can be sub-tasks with `parent_id` instead; the app shows them inside the parent.
 
 ## Reports
 
@@ -144,3 +144,26 @@ Each asset has one page in the app (Records, top of the page) that pulls togethe
 ## Backups
 
 A separate private repository runs a weekly encrypted dump of the `public` schema. Restore steps are in that repo's RESTORE.md.
+
+## Notes and citations
+
+Every fact in a knowledge note says where it came from. Write it as plain text so it reads anywhere:
+
+```
+One line on what this note covers and when the sources were read.
+
+- A fact in one sentence. [1]
+- A fact backed by two sources. [1][2]
+
+Sources
+[1] https://example.org/the/page
+[2] Email from Sam Lee to Nick, 2026-11-12
+```
+
+- Put `[n]` right after the fact it supports. Number sources from 1 in the order they're first cited, and list each source once.
+- The `Sources` heading is the last block of the body, one `[n] …` per line, nothing after it.
+- A source line is a link (anything after it, like `(via PubMed)`, shows as a note), or words. Start words with `Email from …`, `Record: <title in Documents>`, `Person: <name in People>`, `Note: <note title>`, or `<name> said, <date>`; the app shows an icon for each and links Records and People.
+- A claim from an email or a message is the sender's claim; say so in the fact ("Sam wrote that …").
+- To add a fact, add the line and its `[n]`, and add a new source line only if the source isn't listed yet. Never drop a source that a fact still cites.
+- The app still reads the older layout (`- fact. — url ; url`), but write new notes in this one.
+

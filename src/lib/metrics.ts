@@ -78,7 +78,7 @@ export function consistency(series: (number | null)[]) {
   return { hit, n, pct: n ? hit / n : 0, lastTwoMissed }
 }
 
-/** Groups for the daily log, in the order Nick fills it at night. */
+/** Groups for the daily log, in the order it gets filled at night. */
 export const LOG_GROUPS: { key: string; label: string; color: string; test: (m: Metric) => boolean }[] = [
   { key: 'mind', label: 'Mind', color: 'var(--pink)', test: (m) => m.kind === 'scale' },
   { key: 'body', label: 'Body', color: 'var(--mint)', test: (m) => m.role === 'health' },

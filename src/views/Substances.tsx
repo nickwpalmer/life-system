@@ -98,6 +98,9 @@ export function SubstanceSheet({ open, onClose, initial, edit }: { open: boolean
   const listed = names.includes(name)
   return (
     <Sheet open={open} onClose={onClose} title={edit ? 'Edit entry' : 'Log a substance'}>
+      {!edit && <div class="chips" style="margin-bottom:12px">
+        <button class={`chip ${name === 'Caffeine' && note === 'Coffee' ? 'on' : ''}`} style="--c:var(--peach)" onClick={() => { setFresh(false); setName(names.find((x) => subKey(x) === 'caffeine') ?? 'Caffeine'); setAmount('95'); setUnit('mg'); setNote('Coffee') }}>Cup of coffee · 95 mg</button>
+      </div>}
       <label class="field"><span>What</span>
         <select class="input" value={fresh || (!listed && name) ? '__new' : name} onChange={(e) => pick((e.target as HTMLSelectElement).value)}>
           <option value="" disabled>Choose…</option>

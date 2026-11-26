@@ -62,8 +62,10 @@ export function useFin() {
 
 /** What the money card works from, kept on your profile (settings.money). Monarch stays the source of truth for balances. */
 type Goal = { key: string; name: string; target: number; saved?: number; by?: string | null; from?: 'savings' }
-type MoneySet = { normalMonth: number; payday: string; liz?: { amount: number; youOwe: boolean; note?: string; asOf?: string }; bills: { name: string; amount: number; day: number; estimate?: boolean }[]; goals: Goal[] }
-const DEMO_MONEY: MoneySet = { normalMonth: 1500, payday: dayKey(addDays(new Date(), -5)), liz: { amount: 40, youOwe: true }, bills: [{ name: 'Rent share', amount: 700, day: 3 }], goals: [{ key: 'emergency', name: 'Emergency fund', target: 8000, from: 'savings' }, { key: 'car', name: 'Car fund', target: 3000, saved: 400, by: '2027-08-31' }] }
+type MoneySet = { normalMonth: number; payday: string; liz?: { amount: number; youOwe: boolean; note?: string; asOf?: string; name?: string }; bills: { name: string; amount: number; day: number; estimate?: boolean }[]; goals: Goal[] }
+const DEMO_MONEY: MoneySet = { normalMonth: 1200, payday: dayKey(addDays(new Date(), -5)), liz: { amount: 25, youOwe: true, name: 'Sam' }, bills: [{ name: 'Rent', amount: 500, day: 1 }], goals: [{ key: 'emergency', name: 'Emergency fund', target: 5000, from: 'savings' }, { key: 'trip', name: 'Trip fund', target: 1500, saved: 300, by: dayKey(addDays(new Date(), 240)) }] }
+/** The person shared costs are split with, from settings.money.liz.name. */
+const partner = (m?: MoneySet) => m?.liz?.name?.trim() || 'Partner'
 
 /** The next payday on a two-week cycle from a known one. */
 const nextPayday = (anchor: string) => { let d = fromKey(anchor); while (dayKey(d) <= today()) d = addDays(d, 14); return dayKey(d) }
@@ -71,7 +73,7 @@ const nextPayday = (anchor: string) => { let d = fromKey(anchor); while (dayKey(
 const nextOn = (day: number) => { const t = new Date(); const d = new Date(t.getFullYear(), t.getMonth(), day); if (dayKey(d) < today()) d.setMonth(d.getMonth() + 1); return dayKey(d) }
 type DocRow = { id: string; name: string; expires_on: string | null }
 
-/** Safe to spend until payday, months of runway, what's between you and Liz, the next money dates and three goals. */
+/** Safe to spend until payday, months of runway, what's between you and your partner, the next money dates and three goals. */
 function MoneyCard({ fin }: { fin: Fin }) {
   const demo = useStore((s) => s.demo)
   const saved = useStore((s) => s.profile?.settings?.money as MoneySet | undefined)
@@ -106,11 +108,11 @@ function MoneyCard({ fin }: { fin: Fin }) {
         <div class="row between"><span>Checking</span><span>{usd(checking)}</span></div>
         <div class="row between"><span>Card balances</span><span>−{usd(cards)}</span></div>
         {billsDue.map((b) => <div class="row between"><span>{b.name}{b.estimate ? ' (about)' : ''}, {fmtShort(b.on)}</span><span>−{usd(b.amount)}</span></div>)}
-        {lizOwed > 0 && <div class="row between"><span>What you owe Liz</span><span>−{usd(lizOwed)}</span></div>}
+        {lizOwed > 0 && <div class="row between"><span>What you owe {partner(m)}</span><span>−{usd(lizOwed)}</span></div>}
       </div>}
       <div class="mc-row">
         <div><b style={`color:${tone}`}>{runway.toFixed(1)}</b><span>months of runway</span></div>
-        {m.liz && <button onClick={() => setEdit(true)}><b>{m.liz.amount ? usd(m.liz.amount) : 'Even'}</b><span>{m.liz.amount ? (m.liz.youOwe ? 'you owe Liz' : 'Liz owes you') : 'with Liz'}</span></button>}
+        {m.liz && <button onClick={() => setEdit(true)}><b>{m.liz.amount ? usd(m.liz.amount) : 'Even'}</b><span>{m.liz.amount ? (m.liz.youOwe ? `you owe ${partner(m)}` : `${partner(m)} owes you`) : `with ${partner(m)}`}</span></button>}
       </div>
       <div class="mc-dates">{dates.map((d) => <div class="row between small"><span>{d.label}</span><span class="faint">{fmtShort(d.on)}</span></div>)}</div>
       <div class="mc-goals">
@@ -142,10 +144,10 @@ function MoneyEdit({ open, m, onClose }: { open: boolean; m: MoneySet; onClose: 
         <label class="field grow"><span>A normal month costs</span><input class="input" inputMode="decimal" value={f.normalMonth} onInput={(e) => setF({ ...f, normalMonth: num((e.target as HTMLInputElement).value) })} /></label>
         <label class="field grow"><span>A recent payday</span><input class="input" type="date" value={f.payday} onInput={(e) => setF({ ...f, payday: (e.target as HTMLInputElement).value || f.payday })} /></label>
       </div>
-      {f.liz && <div class="field"><span>Shared costs with Liz</span>
+      {f.liz && <div class="field"><span>Shared costs with <input class="input inline-name" aria-label="Who you share costs with" placeholder="Partner" value={f.liz.name ?? ''} onInput={(e) => setF({ ...f, liz: { ...f.liz!, name: (e.target as HTMLInputElement).value } })} /></span>
         <div class="row" style="gap:8px">
           <input class="input" style="max-width:120px" inputMode="decimal" value={f.liz.amount} onInput={(e) => setF({ ...f, liz: { ...f.liz!, amount: num((e.target as HTMLInputElement).value) } })} />
-          <div class="seg grow"><button class={f.liz.youOwe ? 'on' : ''} onClick={() => setF({ ...f, liz: { ...f.liz!, youOwe: true } })}>You owe</button><button class={!f.liz.youOwe ? 'on' : ''} onClick={() => setF({ ...f, liz: { ...f.liz!, youOwe: false } })}>Liz owes</button></div>
+          <div class="seg grow"><button class={f.liz.youOwe ? 'on' : ''} onClick={() => setF({ ...f, liz: { ...f.liz!, youOwe: true } })}>You owe</button><button class={!f.liz.youOwe ? 'on' : ''} onClick={() => setF({ ...f, liz: { ...f.liz!, youOwe: false } })}>{partner(f)} owes</button></div>
         </div>
         {f.liz.note && <p class="faint tiny" style="margin-top:6px">{f.liz.note}</p>}
       </div>}
