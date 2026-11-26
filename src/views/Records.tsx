@@ -120,8 +120,9 @@ export function RecordEditor({ rec, onClose }: { rec: Rec | Partial<Rec> | null;
 /** One record as a card. Expired turns red; expiring within 30 days turns gold. */
 export function RecCard({ r, onOpen, preview }: { r: Rec; onOpen?: () => void; preview?: string }) {
   const st = expState(r), cat = catOf(r.category)
+  const cls = st === 'ok' ? 'fine' : st // .ok is a global style; don't pick it up here
   return (
-    <div class={`rec ${st}`} style={`--c:${cat.c}`} onClick={onOpen} role={onOpen ? 'button' : undefined}>
+    <div class={`rec ${cls}`} style={`--c:${cat.c}`} onClick={onOpen} role={onOpen ? 'button' : undefined}>
       {preview && <span class="rec-tag">{preview}</span>}
       <div class="row" style="gap:10px;align-items:flex-start">
         <span class="m-ico"><Icon name={cat.icon} size={17} /></span>
@@ -131,7 +132,7 @@ export function RecCard({ r, onOpen, preview }: { r: Rec; onOpen?: () => void; p
         </span>
         {st === 'expired' && <span class="stamp">{r.renews ? 'Overdue' : 'Expired'}</span>}
       </div>
-      {st !== 'none' && <div class={`exp ${st}`}><Icon name={st === 'expired' ? 'x' : st === 'soon' ? 'clock' : 'check'} size={14} />{expText(r)}</div>}
+      {st !== 'none' && <div class={`exp ${cls}`}><Icon name={st === 'expired' ? 'x' : st === 'soon' ? 'clock' : 'check'} size={14} />{expText(r)}</div>}
       {r.details && <p>{r.details}</p>}
       {(r.location || r.link || r.login_hint) && (
         <div class="rec-meta">

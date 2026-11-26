@@ -79,7 +79,9 @@ function Fab() {
   useEffect(() => {
     if (!open) return
     const f = (e: KeyboardEvent) => { if (e.key === 'Escape') setOpen(false) }
-    addEventListener('keydown', f); return () => removeEventListener('keydown', f)
+    const g = () => setOpen(false) // leaving the page closes the menu
+    addEventListener('keydown', f); addEventListener('hashchange', g)
+    return () => { removeEventListener('keydown', f); removeEventListener('hashchange', g) }
   }, [open])
   return (
     <>

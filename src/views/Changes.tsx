@@ -117,7 +117,7 @@ export function Changes() {
       {groups.slice(0, 40).map((g, gi) => {
         const shown = open[gi] ? g.items : g.items.slice(0, 6)
         return (
-          <Card title={g.note || 'Changes'} action={<span class="row" style="gap:8px"><span class="faint small">{relTime(g.at)}</span>{g.items.filter((c) => !c.reverted_at).length > 1 && <button class="btn sm" disabled={busy !== null} onClick={() => undo(g.items)}>Undo all</button>}</span>}>
+          <Card title={g.note || 'Changes'} action={<span class="row" style="gap:8px"><span class="faint small" style="white-space:nowrap">{relTime(g.at)}</span>{g.items.filter((c) => !c.reverted_at).length > 1 && <button class="btn sm" disabled={busy !== null} style="white-space:nowrap" onClick={() => undo(g.items)}>Undo all</button>}</span>}>
             {shown.map((c) => {
               const d = diff(c)
               const [verb, color] = opOf(c)

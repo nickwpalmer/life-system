@@ -22,8 +22,8 @@ function MetricMini({ m }: { m: Metric }) {
   const a = avg(s)
   return (
     <div class="metric-row">
-      <div class="row between small"><span>{m.name}</span><span class="faint">{m.role === 'habit' ? `${c.hit}/14 days` : a != null ? `avg ${fmtValue(m, a)}` : 'no data'}</span></div>
-      <BarChart days={days} values={s} color="var(--accent, #a98bff)" target={m.target} />
+      <div class="row between small"><span>{m.name}</span><span class="faint">{m.role === 'habit' ? `${c.hit}/14 days` : a != null ? `avg ${fmtValue(m, a)}` : 'nothing logged yet'}</span></div>
+      {s.some((x) => x != null) && <BarChart days={days} values={s} color="var(--accent, #a98bff)" target={m.target} />}
     </div>
   )
 }

@@ -16,6 +16,7 @@ export function track(p: string) {
 /** Where "up" goes when there's no history: a page's own parent, its base, or Everything. */
 export function parentOf(p = path(), fallback?: string) {
   if (fallback) return fallback
+  if (p === 'inbox') return '#/tasks'
   const [base, sub] = p.split('/')
   if (sub) return `#/${base}`
   return isTabRoot(p) ? '#/today' : '#/more'
