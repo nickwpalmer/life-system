@@ -31,7 +31,10 @@ export default defineConfig({
         globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
         // Never cache API traffic: private data stays out of the service worker cache.
         navigateFallbackDenylist: [/^\/auth/, /^\/rest/],
-        runtimeCaching: []
+        runtimeCaching: [],
+        // A new version takes over at once; the page itself decides when to reload (src/lib/update.ts).
+        skipWaiting: true,
+        clientsClaim: true
       }
     })
   ]

@@ -13,14 +13,19 @@ export const markAuthBusy = (on: boolean) => { busy = Math.max(0, busy + (on ? 1
 export const authBusy = () => busy > 0
 
 function tryApply() {
-  if (!pending || !update) return
+  if (!pending) return
   if (busy) return // markAuthBusy(false) calls this again
   pending = false
-  update(true).catch(() => {})
+  if (waiting && update) update(true).catch(() => location.reload())
+  else location.reload()
 }
+let waiting = false
 
 export function installUpdates() {
-  update = registerSW({ immediate: true, onNeedRefresh() { pending = true; setTimeout(tryApply, 400) } })
+  const sw = navigator.serviceWorker
+  // The new version takes control on its own; reload into it once nothing is in the way.
+  if (sw?.controller) sw.addEventListener('controllerchange', () => { pending = true; setTimeout(tryApply, 400) })
+  update = registerSW({ immediate: true, onNeedRefresh() { waiting = true; pending = true; setTimeout(tryApply, 400) } })
 }
 
 /** Apply a waiting version now (Sync now uses this), unless Face ID is in progress. */
