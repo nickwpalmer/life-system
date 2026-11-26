@@ -33,11 +33,18 @@ export async function lockNow() {
  * Face ID unlock. Marks itself busy so an app update can't reload the page under the Face ID sheet, and gives
  * up after 90 seconds so the button never stays stuck: you can tap it again or use your password.
  */
+let stop: (() => void) | null = null
+/** Stop waiting on the current Face ID try (the Stuck? button). */
+export function cancelPasskey() { stop?.() }
+
 export async function unlockWithPasskey() {
   markAuthBusy(true)
   let timer = 0
   try {
-    const timeout = new Promise<never>((_, rej) => { timer = window.setTimeout(() => rej(new Error('timeout')), 90_000) })
+    const timeout = new Promise<never>((_, rej) => {
+      timer = window.setTimeout(() => rej(new Error('timeout')), 60_000)
+      stop = () => rej(new Error('cancelled'))
+    })
     const { data, error } = await Promise.race([supabase.auth.signInWithPasskey(), timeout])
     if (error) throw error
     // Make sure the session really landed before the lock screen goes away.
@@ -45,6 +52,7 @@ export async function unlockWithPasskey() {
     setState({ locked: false })
   } finally {
     clearTimeout(timer)
+    stop = null
     markAuthBusy(false)
   }
 }

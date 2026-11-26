@@ -1,6 +1,6 @@
-import { useState } from 'preact/hooks'
+import { useRef, useState } from 'preact/hooks'
 import { supabase, lockEnabled } from '../lib/supabase'
-import { unlockWithPasskey, passkeySupported } from '../lib/lock'
+import { unlockWithPasskey, passkeySupported, cancelPasskey } from '../lib/lock'
 import { Icon } from '../ui/icons'
 import { logoUrl, type LogoKey } from '../lib/prefs'
 
@@ -19,19 +19,25 @@ export function AuthScreen() {
   const [err, setErr] = useState('')
   const [ok, setOk] = useState('')
 
+  const run = useRef(0)
   async function faceId() {
+    const me = ++run.current
     setErr(''); setFidBusy(true)
-    try { await unlockWithPasskey() }
+    try { await unlockWithPasskey(); if (me !== run.current) return }
     catch (e) {
       const m = (e as Error).message || ''
       setErr(/disabled/i.test(m) ? 'Face ID sign-in isn’t switched on for this app yet. Use your password for now.'
         : /not.?found|not registered/i.test(m) ? 'No Face ID passkey for this app yet. Sign in with your password, then add one in Settings.'
         : /timeout/i.test(m) ? 'Face ID didn’t finish. Tap it again, or use your email and password below.'
         : /abort|cancel|NotAllowed/i.test(m) ? '' : m)
+      if (me !== run.current) return
       if (/timeout|session/i.test(m)) setShowForm(true)
     }
-    setFidBusy(false)
+    if (me === run.current) setFidBusy(false)
   }
+
+  /** Never stuck: give up on this Face ID try and show the other ways in. */
+  function stopFaceId() { run.current++; cancelPasskey(); setFidBusy(false); setShowForm(true) }
 
   async function submit(e: Event) {
     e.preventDefault(); setErr(''); setOk(''); setBusy(true)
@@ -65,7 +71,9 @@ export function AuthScreen() {
         {passkeySupported() && (
           <>
             <button class="faceid" onClick={faceId} disabled={fidBusy} aria-label={locked ? 'Unlock with Face ID' : 'Sign in with Face ID'}><Icon name="face" size={44} stroke={1.5} /></button>
-            <button class="btn ghost" onClick={faceId} disabled={fidBusy}>{locked ? 'Unlock with Face ID' : 'Sign in with Face ID'}</button>
+            {fidBusy
+              ? <button class="btn ghost" onClick={stopFaceId}>Stuck? Stop and use your password</button>
+              : <button class="btn ghost" onClick={faceId}>{locked ? 'Unlock with Face ID' : 'Sign in with Face ID'}</button>}
           </>
         )}
 
