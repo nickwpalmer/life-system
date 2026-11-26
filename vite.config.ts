@@ -9,7 +9,7 @@ export default defineConfig({
   plugins: [
     preact(),
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       includeAssets: ['icon.svg', 'apple-touch-icon.png', 'icon-maskable-512.png'],
       manifest: {
         name: 'Life',

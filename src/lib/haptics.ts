@@ -42,7 +42,7 @@ export function installHaptics() {
   const TAPPABLE = 'button, a[href], .chip, [role="button"], [role="switch"], .note, .tog, label.check, input[type="checkbox"], select'
   document.addEventListener('click', (e) => {
     const t = e.target as Element | null
-    if (!t || (label && label.contains(t))) return
+    if (!t || (label && label.contains(t)) || t.closest('.lockscreen')) return // nothing extra while Face ID runs
     const el = t.closest(TAPPABLE)
     if (!el || (el as HTMLButtonElement).disabled) return
     haptic()

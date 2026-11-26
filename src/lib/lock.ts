@@ -1,5 +1,6 @@
 import { supabase, lockEnabled } from './supabase'
 import { setState } from './store'
+import { markAuthBusy, authBusy } from './update'
 
 /**
  * Face ID lock. When on, the session is memory-only (see supabase.ts), so a cold
@@ -19,7 +20,7 @@ export function installIdleLock() {
     if (!away) return
     if (!document.querySelector('.sheet textarea, .sheet input:focus')) location.hash = '#/today'
     navigator.serviceWorker?.getRegistration().then((r) => r?.update()).catch(() => {})
-    if (lockEnabled()) await lockNow()
+    if (lockEnabled() && !authBusy()) await lockNow()
   })
 }
 
@@ -28,10 +29,24 @@ export async function lockNow() {
   setState({ locked: true })
 }
 
+/**
+ * Face ID unlock. Marks itself busy so an app update can't reload the page under the Face ID sheet, and gives
+ * up after 90 seconds so the button never stays stuck: you can tap it again or use your password.
+ */
 export async function unlockWithPasskey() {
-  const { error } = await supabase.auth.signInWithPasskey()
-  if (error) throw error
-  setState({ locked: false })
+  markAuthBusy(true)
+  let timer = 0
+  try {
+    const timeout = new Promise<never>((_, rej) => { timer = window.setTimeout(() => rej(new Error('timeout')), 90_000) })
+    const { data, error } = await Promise.race([supabase.auth.signInWithPasskey(), timeout])
+    if (error) throw error
+    // Make sure the session really landed before the lock screen goes away.
+    if (!data?.session) { const { data: s } = await supabase.auth.getSession(); if (!s.session) throw new Error('No session after Face ID') }
+    setState({ locked: false })
+  } finally {
+    clearTimeout(timer)
+    markAuthBusy(false)
+  }
 }
 
 export const passkeySupported = () => typeof window !== 'undefined' && !!window.PublicKeyCredential

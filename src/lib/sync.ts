@@ -1,3 +1,4 @@
+import { applyUpdateSoon } from './update'
 import { bootstrap } from './db'
 import { reloadAll } from './rows'
 import { getState, setState, toast } from './store'
@@ -71,7 +72,7 @@ export function syncAll(quiet = false) {
     step('app', async () => {
       if (demo) return ['ok', 'Latest version']
       const u = await checkAppUpdate()
-      if (u === 'new') { setTimeout(() => location.reload(), 2500); return ['ok', 'New version found. Reloading…'] }
+      if (u === 'new') { setTimeout(applyUpdateSoon, 2500); return ['ok', 'New version found. Reloading…'] }
       return ['ok', 'Latest version']
     }),
     step('ring', syncRing),

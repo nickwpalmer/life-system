@@ -1,5 +1,5 @@
 import { render } from 'preact'
-import { registerSW } from 'virtual:pwa-register'
+import { installUpdates } from './lib/update'
 import { App } from './app'
 import './styles.css'
 import { applyTheme, applyLogo, type LogoKey } from './lib/prefs'
@@ -12,5 +12,5 @@ try {
   if (l) applyLogo(l)
 } catch { /* private mode */ }
 
-registerSW({ immediate: true })
+installUpdates()
 render(<App />, document.getElementById('app')!)

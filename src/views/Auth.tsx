@@ -26,7 +26,9 @@ export function AuthScreen() {
       const m = (e as Error).message || ''
       setErr(/disabled/i.test(m) ? 'Face ID sign-in isn’t switched on for this app yet. Use your password for now.'
         : /not.?found|not registered/i.test(m) ? 'No Face ID passkey for this app yet. Sign in with your password, then add one in Settings.'
+        : /timeout/i.test(m) ? 'Face ID didn’t finish. Tap it again, or use your email and password below.'
         : /abort|cancel|NotAllowed/i.test(m) ? '' : m)
+      if (/timeout|session/i.test(m)) setShowForm(true)
     }
     setFidBusy(false)
   }
