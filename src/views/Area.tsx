@@ -3,7 +3,7 @@ import { useStore, areaByKey } from '../lib/store'
 import { lastNDays, fmtDay, dayKey, today } from '../lib/dates'
 import { dailySeries, fmtValue, consistency } from '../lib/metrics'
 import type { Task, Metric } from '../lib/types'
-import { PageHead, Card, Ring, Sheet } from '../ui/kit'
+import { PageHead, Card, Ring, Sheet, type Hub } from '../ui/kit'
 import { LineChart, BarChart } from '../ui/charts'
 import { TaskRow, TaskSheet, AddTask, openTask } from './Tasks'
 import { goalProgress } from './Goals'
@@ -118,7 +118,7 @@ function Mental() {
   </>
 }
 
-export function AreaView({ areaKey }: { areaKey: string }) {
+export function AreaView({ areaKey, hub }: { areaKey: string; hub?: Hub }) {
   const a = useStore(() => areaByKey(areaKey))
   const tasks = useStore((s) => s.tasks)
   const goals = useStore((s) => s.goals)
@@ -127,11 +127,11 @@ export function AreaView({ areaKey }: { areaKey: string }) {
   if (!a) return <p class="empty">That area doesn’t exist.</p>
   const open = tasks.filter((t) => openTask(t) && t.area_id === a.id)
   const gs = goals.filter((g) => g.area_id === a.id && g.status === 'active' && !g.suggested)
-  const ms = metrics.filter((m) => m.active && m.area_id === a.id && !(a.key === 'finances' && m.key === 'spend') && !(a.key === 'mental' && ['mood', 'anxiety'].includes(m.key)))
+  const ms = metrics.filter((m) => m.active && m.area_id === a.id && !(a.key === 'finances' && m.key === 'spend') && !(a.key === 'mental' && ['mood', 'anxiety'].includes(m.key)) && !(hub && m.role === 'habit'))
   const doneWeek = tasks.filter((t) => t.area_id === a.id && t.status === 'done' && t.completed_at && Date.now() - new Date(t.completed_at).getTime() < 7 * 864e5).length
   return (
     <div style={`--accent:${a.color}`}>
-      <PageHead title={a.name} back="#/more" sub={`${open.length} open · ${doneWeek} done this week`} icon={a.key === 'education' ? 'school' : a.key === 'finances' ? 'wallet' : a.key === 'mental' ? 'brain' : 'layers'} color={a.color ?? undefined} />
+      <PageHead hub={hub} title={a.name} back="#/more" sub={`${open.length} open · ${doneWeek} done this week`} icon={a.key === 'education' ? 'school' : a.key === 'finances' ? 'wallet' : a.key === 'mental' ? 'brain' : 'layers'} color={a.color ?? undefined} />
       {a.key === 'finances' && <Finances />}
       {a.key === 'mental' && <Mental />}
       {a.key === 'education' && <SchoolPanel />}

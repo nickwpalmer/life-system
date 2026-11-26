@@ -27,12 +27,15 @@ import { WeeklyReview } from './views/Review'
 import { AreaView } from './views/Area'
 import { People, GlobalPersonSheet } from './views/People'
 import { Capture } from './views/Capture'
-import { Substances, GlobalSubstanceSheet } from './views/Substances'
+import { GlobalSubstanceSheet } from './views/Substances'
+import { Health } from './views/Health'
 import { Education } from './views/Education'
 import { Changes } from './views/Changes'
 import { Help } from './views/Help'
 import { usePrefs, logoUrl, applyTheme, applyLogo } from './lib/prefs'
 import { syncAll } from './lib/sync'
+import { MOVED, reviewHub, recordsHub } from './lib/hubs'
+import { relTime } from './lib/dates'
 import { track, setTabs, tabTap, onTabReset, installEdgeSwipe } from './lib/nav'
 import { installHaptics } from './lib/haptics'
 
@@ -101,7 +104,14 @@ function Fab() {
 }
 
 function useRoute() {
-  const get = () => location.hash.replace(/^#\/?/, '') || 'today'
+  const get = () => {
+    const r = location.hash.replace(/^#\/?/, '') || 'today'
+    // Pages merged in v0.7 keep their old addresses; send them to the view they became.
+    const [p, q] = r.split('?')
+    const to = MOVED[p!] ?? (p!.startsWith('substances') ? 'health/substances' : null)
+    if (to) { history.replaceState(null, '', `${location.pathname}${location.search}#/${to}${q ? `?${q}` : ''}`); return to }
+    return r
+  }
   const [route, setRoute] = useState(get())
   useEffect(() => {
     const f = () => { const r = get(); track(r); setRoute(r); window.scrollTo({ top: 0 }) }
@@ -125,44 +135,65 @@ export const NAV: NavItem[] = [
   { r: 'journal', icon: 'book', label: 'Journal', c: 'var(--mint)', group: 'main', sub: 'Write it down' },
   { r: 'school', icon: 'school', label: 'Education', c: 'var(--lilac)', group: 'life', sub: 'Classes, degree, history' },
   { r: 'money', icon: 'money', label: 'Finances', c: 'var(--gold)', group: 'life', sub: 'Accounts, bills, spending' },
-  { r: 'health', icon: 'heart', label: 'Health', c: 'var(--mint)', group: 'life', sub: 'Sleep, body, mind' },
-  { r: 'substances', icon: 'flask', label: 'Substances', c: 'var(--orange)', group: 'life', sub: 'Everything non-food' },
+  { r: 'health', icon: 'heart', label: 'Health', c: 'var(--mint)', group: 'life', sub: 'Body, mind, habits, substances' },
   { r: 'reading', icon: 'books', label: 'Reading', c: 'var(--sky)', group: 'life', sub: 'Books and where you are' },
   { r: 'goals', icon: 'target', label: 'Goals', c: 'var(--gold)', group: 'plan', sub: 'What you’re building' },
-  { r: 'review', icon: 'review', label: 'Weekly review', c: 'var(--lilac)', group: 'plan', sub: 'Last week, next week' },
-  { r: 'insights', icon: 'chart', label: 'Insights', c: 'var(--teal)', group: 'plan', sub: 'Patterns and reviews' },
+  { r: 'review', icon: 'review', label: 'Review', c: 'var(--lilac)', group: 'plan', sub: 'Your week, and the patterns across weeks' },
   { r: 'people', icon: 'users', label: 'People', c: 'var(--coral)', group: 'ref', sub: 'Birthdays, keeping in touch' },
-  { r: 'records', icon: 'layers', label: 'Documents', c: 'var(--peach)', group: 'ref', sub: 'IDs, insurance, certifications' },
-  { r: 'things', icon: 'car', label: 'Your things', c: 'var(--sky)', group: 'ref', sub: 'Car, apartment, inventories' },
+  { r: 'records', icon: 'layers', label: 'Records', c: 'var(--peach)', group: 'ref', sub: 'Documents, car, apartment, inventories' },
   { r: 'notes', icon: 'note', label: 'Notes', c: 'var(--gold)', group: 'ref', sub: 'Lists, how-tos, cited facts, ideas' },
   { r: 'changes', icon: 'history', label: 'Claude’s changes', c: 'var(--violet)', group: 'system', sub: 'See, undo, leave Claude a note' },
   { r: 'settings', icon: 'gear', label: 'Settings', c: 'var(--muted)', group: 'system', sub: 'Preferences and connections' },
   { r: 'help', icon: 'help', label: 'Help', c: 'var(--sky)', group: 'system', sub: 'How things work' },
 ]
-export const navItem = (r: string) => NAV.find((n) => n.r === r)
+export const navItem = (r: string) => NAV.find((n) => n.r === (MOVED[r]?.split('/')[0] ?? r))
+/** Your bottom-bar picks, with any page that moved in v0.7 swapped for where it lives now. */
+export const tabPicks = (t: string[]) => [...new Set(t.map((r) => MOVED[r]?.split('/')[0] ?? r))]
 
+/**
+ * The sidebar, on iPad and Mac (any window 700px or wider, which is what Apple calls a regular width).
+ * Apple's guidance: a sidebar for an app with many areas, grouped, two levels at most, and people can hide it.
+ * Hidden, it becomes a rail of icons. The + menu's quick logs sit under Capture, since there's no + button here.
+ */
 function Sidebar({ base }: { base: string }) {
   const inbox = useStore((s) => s.tasks.filter((t) => t.status === 'inbox').length)
+  const synced = useStore((s) => s.synced_at)
+  const syncing = useStore((s) => !!s.sync && s.sync.some((i) => i.state === 'wait'))
+  const [mini, setMini] = useState(() => { try { return localStorage.getItem('life-side-mini') === '1' } catch { return false } })
+  useEffect(() => {
+    document.documentElement.classList.toggle('side-mini', mini)
+    try { localStorage.setItem('life-side-mini', mini ? '1' : '0') } catch { /* private mode */ }
+  }, [mini])
   const a = (n: NavItem) => (
-    <a class={`s-item ${base === n.r ? 'on' : ''}`} href={`#/${n.r}`} style={`--c:${n.c}`}>
-      <span class="s-ico"><Icon name={n.icon} size={19} /></span>{n.label}
+    <a class={`s-item ${base === n.r ? 'on' : ''}`} href={`#/${n.r}`} style={`--c:${n.c}`} title={mini ? n.label : undefined} aria-label={n.label} aria-current={base === n.r ? 'page' : undefined}>
+      <span class="s-ico"><Icon name={n.icon} size={19} /></span><span class="s-txt">{n.label}</span>
       {n.r === 'tasks' && inbox > 0 && <span class="badge">{inbox}</span>}
     </a>
   )
+  const group = (g: NavItem['group'], label?: string) => <>
+    {label && <div class="s-label"><span class="s-txt">{label}</span></div>}
+    {NAV.filter((n) => n.group === g).map(a)}
+  </>
   return (
     <aside class="side" aria-label="Main">
-      <a class="brand" href="#/today"><img src={logoUrl(usePrefs().logo)} alt="" />Life</a>
-      <button class="btn primary new" onClick={() => setState({ capture: true })}><Icon name="plus" size={18} /> Capture <span class="tiny" style="opacity:.6">N</span></button>
-      {NAV.filter((n) => n.group === 'main').map(a)}
-      <div class="s-label">Areas</div>
-      {NAV.filter((n) => n.group === 'life').map(a)}
-      <div class="s-label">Plan and look back</div>
-      {NAV.filter((n) => n.group === 'plan').map(a)}
-      <div class="s-label">Reference</div>
-      {NAV.filter((n) => n.group === 'ref').map(a)}
-      <div style="height:10px" />
-      {NAV.filter((n) => n.group === 'system').map(a)}
-      <div class="s-foot">Press N to capture · 1–7 to switch</div>
+      <div class="brand-row">
+        <a class="brand" href="#/today"><img src={logoUrl(usePrefs().logo)} alt="" /><span class="s-txt">Life</span></a>
+        <button class="icon-btn sm side-toggle" onClick={() => setMini(!mini)} aria-label={mini ? 'Show the sidebar' : 'Hide the sidebar'} title={mini ? 'Show the sidebar' : 'Hide the sidebar'}><Icon name="sidebar" size={17} /></button>
+      </div>
+      <button class="btn primary new" onClick={() => setState({ capture: true })} title="Capture (N)"><Icon name="plus" size={18} /><span class="s-txt">Capture</span><span class="s-txt kbd">N</span></button>
+      <div class="quick">{FAN.filter((f) => f.k !== 'task').map((f) => <button class="q" style={`--c:${f.c}`} onClick={() => { haptic(); f.go() }} aria-label={`Log ${f.label.toLowerCase()}`} title={f.label}><Icon name={f.icon} size={17} /></button>)}</div>
+      <nav class="s-nav">
+        {group('main')}
+        {group('life', 'Areas')}
+        {group('plan', 'Plan and look back')}
+        {group('ref', 'Reference')}
+        <div class="s-gap" />
+        {group('system')}
+      </nav>
+      <button class="s-sync" onClick={() => syncAll()} title="Sync now" aria-label="Sync now">
+        <span class={`s-ico ${syncing ? 'spin' : ''}`}><Icon name="history" size={17} /></span>
+        <span class="s-txt">{syncing ? 'Syncing…' : 'Sync now'}<span class="faint tiny">{synced ? `Calendar copied ${relTime(synced)}` : 'Calendar not copied yet'}</span></span>
+      </button>
     </aside>
   )
 }
@@ -170,8 +201,8 @@ function Sidebar({ base }: { base: string }) {
 function TabBar({ base }: { base: string }) {
   const inbox = useStore((s) => s.tasks.some((t) => t.status === 'inbox'))
   const prefs = usePrefs()
-  const tabs = [navItem('today')!, ...prefs.tabs.map(navItem).filter((n): n is NavItem => !!n)]
-  setTabs(prefs.tabs)
+  const tabs = [navItem('today')!, ...tabPicks(prefs.tabs).map(navItem).filter((n): n is NavItem => !!n)]
+  setTabs(tabPicks(prefs.tabs))
   const onTab = tabs.some((t) => t.r === base)
   return (
     <nav class="nav" aria-label="Main">
@@ -206,7 +237,7 @@ export function App() {
   const loaded = useStore((s) => s.loaded)
   const route = useRoute()
   const [resetN, setResetN] = useState(0)
-  setTabs(usePrefs().tabs)
+  setTabs(tabPicks(usePrefs().tabs))
   useEffect(() => onTabReset(() => setResetN((n) => n + 1)), [])
   useShortcuts()
   const { theme, logo } = usePrefs()
@@ -254,23 +285,20 @@ export function App() {
     case 'tasks': view = <Tasks areaKey={sub} />; break
     case 'school': view = <Education tab={sub} />; break
     case 'money': view = <AreaView areaKey="finances" />; break
-    case 'health': view = <AreaView areaKey="health" />; break
-    case 'substances': view = <Substances />; break
+    case 'health': view = <Health tab={sub} />; break
     case 'changes': view = <Changes />; break
     case 'help': view = <Help section={sub} />; break
     case 'inbox': view = <Tasks initial="inbox" />; break
     case 'log': view = <DailyLog day={sub || today()} />; break
     case 'journal': view = <Journal />; break
-    case 'insights': view = <Insights />; break
     case 'more': view = <More />; break
     case 'notes': view = <Notes />; break
-    case 'records': view = sub ? <AssetPage key={sub} ref_={sub} /> : <Records />; break
-    case 'things': view = <Things />; break
+    case 'records': view = sub === 'things' ? <Things hub={recordsHub('things')} /> : sub ? <AssetPage key={sub} ref_={sub} /> : <Records hub={recordsHub('docs')} />; break
     case 'reading': view = <Reading />; break
     case 'calendar': view = <Calendar mode={sub} />; break
     case 'settings': view = <Settings />; break
     case 'goals': view = <Goals />; break
-    case 'review': view = <WeeklyReview />; break
+    case 'review': view = sub === 'patterns' ? <Insights hub={reviewHub('patterns')} /> : <WeeklyReview hub={reviewHub('week')} />; break
     case 'people': view = <People />; break
     case 'area': view = <AreaView areaKey={sub} />; break
     case 'checkin': view = <CheckinView kind={sub === 'night' ? 'night' : 'morning'} />; break

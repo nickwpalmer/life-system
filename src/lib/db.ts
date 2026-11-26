@@ -20,6 +20,8 @@ const isDemo = () => getState().demo
 const uid = () => getState().session?.user.id
 let inflight = 0
 let lastLoad = 0
+/** When the app last pulled your data from the database (0 if not yet). */
+export const lastLoadedAt = () => lastLoad
 
 type Row = { id: string } & Record<string, unknown>
 const list = (t: Table) => getState()[COLL[t]] as unknown as Row[]

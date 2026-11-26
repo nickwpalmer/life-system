@@ -22,6 +22,12 @@ export function parentOf(p = path(), fallback?: string) {
   return isTabRoot(p) ? '#/today' : '#/more'
 }
 
+/** Switch views inside one page (a segmented control) without adding a step to Back. */
+export function replaceRoute(href: string) {
+  stack[stack.length - 1] = href.replace(/^#\/?/, '')
+  location.replace(href)
+}
+
 export function goBack(fallback?: string) {
   if (stack.length > 1) history.back()
   else location.hash = parentOf(path(), fallback)

@@ -105,7 +105,7 @@ function Dash() {
       {tile('#/health', 'var(--sky)', 'Sleep', sleep ? `${Math.round(sleep.v * 10) / 10}h` : '–', sleep ? when(sleep, 'last night') : 'No recent data', spark('sleep_hours', 10))}
       {tile('#/health', 'var(--mint)', 'Steps', steps ? Math.round(steps.v).toLocaleString() : '–', steps ? when(steps, steps.d === t ? 'today' : 'yesterday') : 'No recent data')}
       {tile('#/tasks', 'var(--violet)', 'Tasks', `${done}/${done + due}`, 'done today', <span class="dbar"><i style={`width:${done + due ? (done / (done + due)) * 100 : 0}%`} /></span>)}
-      {tile('#/substances', 'var(--gold)', 'Substances', String(subN), 'logged today')}
+      {tile('#/health/substances', 'var(--gold)', 'Substances', String(subN), 'logged today')}
     </section>
   )
 }
@@ -208,6 +208,7 @@ function Gaps() {
 function ComingUp() {
   const tasks = useStore((s) => s.tasks)
   const people = useStore((s) => s.people)
+  const events = useStore((s) => s.events)
   const goals = useStore((s) => s.goals)
   const areas = useStore((s) => s.areas)
   const [kd] = useKeyDates()
@@ -218,6 +219,8 @@ function ComingUp() {
   const items: Item[] = []
   for (const t of tasks) if (openTask(t) && t.due_date && daysUntil(t.due_date) > 1 && daysUntil(t.due_date) <= 14 && t.priority >= 3) items.push({ d: t.due_date, title: t.title, c: areas.find((a) => a.id === t.area_id)?.color ?? 'var(--violet)', href: '#/tasks' })
   for (const p of people) { const b = nextBirthday(p); if (b && daysUntil(b) <= 21) items.push({ d: b, title: `${p.name}’s birthday`, c: 'var(--pink)', href: '#/people' }) }
+  // Birthdays live on Google Calendar (v0.7), so any birthday event there counts too, once per day and name.
+  for (const e of events) if (/birthday/i.test(e.title)) { const d = eventDay(e); if (daysUntil(d) >= 0 && daysUntil(d) <= 21 && !items.some((i) => i.d === d && /birthday/i.test(i.title) && i.title.split(/[’' ]/)[0] === e.title.split(/[’' ]/)[0])) items.push({ d, title: e.title, c: 'var(--pink)', href: '#/calendar' }) }
   for (const g of goals) if (g.status === 'active' && !g.suggested && g.target_date && daysUntil(g.target_date) >= 0 && daysUntil(g.target_date) <= 30) items.push({ d: g.target_date, title: g.title, c: 'var(--gold)', href: '#/goals' })
   for (const k of kd ?? []) if (!k.done && (k.kind === 'exam' || k.kind === 'term') && daysUntil(k.day) > 0 && daysUntil(k.day) <= 21) items.push({ d: k.day, title: k.course ? `${k.course}: ${k.title}` : k.title, c: k.kind === 'exam' ? 'var(--pink)' : 'var(--lilac)', href: '#/school' })
   for (const r of recs ?? []) if (r.expires_on && daysUntil(r.expires_on) >= 0 && daysUntil(r.expires_on) <= 45) items.push({ d: r.expires_on, title: `${r.name} ${r.renews ? 'renews' : 'ends'}`, c: daysUntil(r.expires_on) <= 30 ? 'var(--gold)' : 'var(--peach)', href: '#/records' })

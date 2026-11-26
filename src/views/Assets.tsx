@@ -85,7 +85,7 @@ export function AssetPage({ ref_ }: { ref_: string }) {
   const [allLogs, setAllLogs] = useState(false)
   if (!assets) return <div class="skeleton" />
   const a = findAsset(assets, ref_)
-  if (!a) return <><PageHead title="Not found" back="#/things" /><div class="card"><p class="muted">That isn’t one of your things anymore.</p></div></>
+  if (!a) return <><PageHead title="Not found" back="#/records/things" /><div class="card"><p class="muted">That isn’t one of your things anymore.</p></div></>
   const k = KIND[a.kind] ?? KIND.other
   const mine = (recs ?? []).filter((r) => r.asset_id === a.id).sort((x, y) => ({ expired: 0, soon: 1, ok: 2, none: 3 })[expState(x)] - ({ expired: 0, soon: 1, ok: 2, none: 3 })[expState(y)])
   const missing = k.starters.filter(([n]) => !mine.some((r) => r.name.toLowerCase().includes(n.toLowerCase().replace(/^car /, ''))))
@@ -96,7 +96,7 @@ export function AssetPage({ ref_ }: { ref_: string }) {
   const home = areaByKey('home')
   return (
     <>
-      <PageHead title={a.name} sub={k.label} back="#/things" icon={k.icon} color={k.c}
+      <PageHead title={a.name} sub={k.label} back="#/records/things" icon={k.icon} color={k.c}
         action={<button class="btn ghost sm" onClick={() => setEditAsset(a)}><Icon name="edit" size={16} />Edit</button>} />
       {(a.details || a.notes) && <div class="card soft">{a.details && <p>{a.details}</p>}{a.notes && <p class="muted small" style="margin-top:6px">{a.notes}</p>}</div>}
 

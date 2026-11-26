@@ -10,6 +10,7 @@ const P: Record<string, JSX.Element> = {
   chart: <><path d="M4 20V10M10 20V4M16 20v-7M22 20H2" /></>,
   grid: <><rect x="4" y="4" width="7" height="7" rx="2" /><rect x="13" y="4" width="7" height="7" rx="2" /><rect x="4" y="13" width="7" height="7" rx="2" /><rect x="13" y="13" width="7" height="7" rx="2" /></>,
   plus: <path d="M12 5v14M5 12h14" />,
+  sidebar: <><rect x="3" y="4" width="18" height="16" rx="3" /><path d="M9 4v16" /></>,
   x: <path d="M6 6l12 12M18 6 6 18" />,
   books: <><path d="M4 4h4v16H4zM9 4h4v16H9z" /><path d="m14.5 5.2 3.8-1 3.2 14.7-3.8 1z" /></>,
   smile: <><circle cx="12" cy="12" r="9" /><path d="M8.5 14.5c1.9 1.8 5.1 1.8 7 0M9 9.5v.5M15 9.5v.5" /></>,

@@ -43,9 +43,10 @@ select id, kind, change_id, body, created_at from claude_inbox where status = 'o
 | Anything about the car or the apartment (a repair, a to-do, a document) | `assets` + related tables | See Assets. |
 | A reference note, list or how-to | `notes` | `title`, `body`. An idea gets `tags = '{idea}'` and shows under Notes > Ideas. Facts from research get `tags` including `knowledge` and must be cited (see Notes and citations below). |
 | A book they're reading or want to | `books` | `title`, `author`, `status` in reading, to_read (shows as Up next), paused, done, `page`, `pages`, `cover_url`, `notes`, `sort`. Update `page` when they say where they are. |
-| A person, birthday, keep-in-touch | `people` | `name`, `relation`, `org`, `phone`, `email`, `birthday`, `contact_every_days`, `last_contact`, `notes`. `birthday` is `YYYY-MM-DD`, or `MM-DD` when the year isn't known. |
+| A person, birthday, keep-in-touch | `people` | `name`, `relation`, `org`, `phone`, `email`, `birthday`, `contact_every_days`, `last_contact`, `notes`. `birthday` is `YYYY-MM-DD`, or `MM-DD` when the year isn't known. Every birthday also lives on Google Calendar as a yearly all-day event on the main calendar titled `<Name>’s birthday`; check for one before adding it. Home reads birthdays from both. |
 | An outcome they want | `goals` | `status='active'`; if you're proposing it rather than they stated it, `suggested=true`. |
-| A school deadline, exam or term date | `key_dates` | `kind` in deadline, exam, term, event; `area_key='education'`; `course` like `MAT 2010`. |
+| A school to-do with a due date (homework, paper, project, presentation) | `tasks` | `area_id` = education, `due_date`, the class code in the title or a tag (`BME 1900`). This is the one place for school to-dos. |
+| An exam, term date or other school date that isn't a to-do | `key_dates` | `kind` in exam, term, event (deadline only when no task fits); `area_key='education'`; `course` like `MAT 2010`. Never copy a task into `key_dates`; School shows tasks, key dates and Canvas together and flags dates that disagree. |
 | A class taken, grade, transfer credit | `edu_courses` / `courses` / `degree_reqs` | History, current or planned classes, degree plan. |
 | A scholarship or grant | `scholarships` | `status` in maybe, to_apply, applied, awarded, declined, missed. |
 | A graded item in a class (homework, quiz, test, final) | `grade_items` | `course_id`, `category` (must match a name in that course's `data.grading`), `name`, `score`, `possible` (blank means score is a percent), `guess` (expected score in the same units until it's graded, used in the what-ifs), `due_on`, `status` in todo, done (turned in, no score), graded, missing (incomplete), excused (doesn't count), `note`. Update the existing row; don't add duplicates. |
@@ -64,7 +65,7 @@ Areas (`areas.key`): `education`, `mental`, `finances`, `health`, `work`, `relat
 - `source`: `app` (typed in the app), `claude` (you), `ticktick` (one-time import, read-only history).
 - `recurrence`: `daily`, `weekdays`, `weekly`, `biweekly`, `monthly`, `yearly`, or null. When a repeating task is marked done, the app keeps that row as done and adds an open copy with the next `due_date` and `external_id = 'repeat-of:<done row id>'`. To make something repeat, set `recurrence` and a `due_date` on one open row; don't pre-create future copies.
 - Lists are tags (`Shopping`, `car`, `WSU`). Class codes like `MAT-2010` group school work by class. Don't add `Personal`; the area covers it. TickTick is being retired: the app is the only task list, so add tasks here, never in TickTick.
-- Steps of a bigger task are tasks with `parent_id`; the app shows them inside the parent. Short checklists can stay in `notes` as `- [ ]` lines.
+- Steps (rule set by the owner, Nov 26): quick steps are checklist lines in `notes` (`- [ ] step`). Make a child task with `parent_id` only when a step needs its own date. Don't make a child task for a step that has no date of its own.
 
 ## Logs (daily numbers)
 
@@ -126,7 +127,7 @@ Each asset has one page in the app (Records, top of the page) that pulls togethe
 
 ## Calendar and money
 
-- `calendar_events` is a copy of Google Calendar, refreshed automatically. Don't edit it; change the real calendar instead.
+- `calendar_events` is a copy of Google Calendar that a Claude routine refreshes every 6 hours; `synced_at` says when. Don't edit it; change the real calendar instead. Settings > Syncs shows when each source last came in.
 - `fin_*` tables are snapshots read from Monarch. Don't hand-edit them.
 
 ## Check-ins and reviews
@@ -167,3 +168,13 @@ Sources
 - To add a fact, add the line and its `[n]`, and add a new source line only if the source isn't listed yet. Never drop a source that a fact still cites.
 - The app still reads the older layout (`- fact. — url ; url`), but write new notes in this one.
 
+
+## Pages (v0.7)
+
+Related pages are merged into one page with a segmented control under the title. Old links redirect.
+
+- Health (`#/health`): Body (`health`), Mind (`health/mind`, the mental area), Habits (`health/habits`), Substances (`health/substances`).
+- Review (`#/review`): This week (`review`), Patterns (`review/patterns`, formerly Insights).
+- Records (`#/records`): Documents (`records`), Your things (`records/things`, car, apartment, inventories).
+
+Metrics keep their `role` (habit, health, track, vice). Habits shows every `role='habit'` metric from any area; Body and Mind show the rest of their area's trackers.

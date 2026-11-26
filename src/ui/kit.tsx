@@ -3,7 +3,7 @@ import type { ComponentChildren } from 'preact'
 import { useEffect, useState, useRef } from 'preact/hooks'
 import { useStore, setState } from '../lib/store'
 import { Icon } from './icons'
-import { goBack, isTabRoot, parentOf } from '../lib/nav'
+import { goBack, isTabRoot, parentOf, replaceRoute } from '../lib/nav'
 import { haptic } from '../lib/haptics'
 
 /** Bottom sheet on phones, centered card on wide screens. Esc closes. */
@@ -145,17 +145,33 @@ export function ListInputs({ values, onChange, placeholder, count = 3 }: { value
 }
 
 /** Page header. On phones a back arrow shows on every page that isn't a bottom-bar tab; it goes back the way you came. The sidebar handles it on desktop. */
-export function PageHead({ title, sub, back, action, icon, color }: { title: ComponentChildren; sub?: ComponentChildren; back?: string; action?: ComponentChildren; icon?: string; color?: string }) {
-  return (
+/**
+ * A page made of a few views that belong together (Health, Review, Records). The title stays put and a
+ * segmented control under it switches views, the way Apple's apps do it, so merged pages still read as one place.
+ */
+export type Hub = { title: string; icon: string; color: string; on: string; items: [key: string, label: string, href: string][] }
+export function HubTabs({ hub }: { hub: Hub }) {
+  return <nav class="seg hub-seg" aria-label={hub.title}>{hub.items.map(([k, l, h]) => <a class={hub.on === k ? 'on' : ''} href={h} aria-current={hub.on === k ? 'page' : undefined} onClick={(e) => { e.preventDefault(); if (hub.on !== k) { haptic(); replaceRoute(h) } }}>{l}</a>)}</nav>
+}
+
+export function PageHead({ title, sub, back, action, icon, color, hub }: { title: ComponentChildren; sub?: ComponentChildren; back?: string; action?: ComponentChildren; icon?: string; color?: string; hub?: Hub }) {
+  const p = location.hash.replace(/^#\/?/, '').split('?')[0] || 'today'
+  // A merged page is one place: its views are siblings, so Back leaves the page rather than stepping through them.
+  if (hub) { title = hub.title; icon = hub.icon; color = hub.color; back = '#/more' }
+  const showBack = hub ? !isTabRoot(p.split('/')[0]) : back || !isTabRoot()
+  // With a sidebar, top-level pages need no back arrow; pages a level down (a car, a day) keep one.
+  const deep = !hub && p.includes('/') && !/^(health|review|records\/things|school|calendar|help)/.test(p)
+  return (<>
     <div class="page-title">
       <div class="row" style="min-width:0">
-        {(back || !isTabRoot()) && <a class="icon-btn back" href={parentOf(undefined, back)} aria-label="Back" onClick={(e) => { e.preventDefault(); goBack(back) }}><Icon name="back" size={20} /></a>}
+        {showBack && <a class={`icon-btn back ${deep ? 'deep' : ''}`} href={parentOf(undefined, back)} aria-label="Back" onClick={(e) => { e.preventDefault(); goBack(back) }}><Icon name="back" size={20} /></a>}
         {icon && <span class="title-ico" style={color ? `--c:${color}` : ''}><Icon name={icon} size={20} /></span>}
         <div style="min-width:0"><h1>{title}</h1>{sub && <p class="muted small">{sub}</p>}</div>
       </div>
       {action}
     </div>
-  )
+    {hub && <HubTabs hub={hub} />}
+  </>)
 }
 
 /** Kept for older screens. */

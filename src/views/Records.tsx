@@ -5,7 +5,7 @@ import { useRows, addRow, patchRow, dropRow, registerDemo } from '../lib/rows'
 import { toast } from '../lib/store'
 import { daysUntil, fmtShort, fromKey, inDays } from '../lib/dates'
 import { Icon } from '../ui/icons'
-import { Sheet, PageHead, Switch, haptic } from '../ui/kit'
+import { Sheet, PageHead, Switch, haptic, type Hub } from '../ui/kit'
 
 /**
  * Records: the documents and facts you need to find fast (insurance, car, taxes, IDs, leases).
@@ -145,7 +145,7 @@ export function RecCard({ r, onOpen, preview }: { r: Rec; onOpen?: () => void; p
   )
 }
 
-export function Records() {
+export function Records({ hub }: { hub?: Hub }) {
   const rows = useRows<Rec>('records')
   const [q, setQ] = useState('')
   const [cat, setCat] = useState<string | null>(null)
@@ -159,7 +159,7 @@ export function Records() {
   const attention = (rows ?? []).filter((r) => expState(r) === 'expired' || expState(r) === 'soon').length
   return (
     <>
-      <PageHead title="Documents" sub={attention ? `${attention} need${attention === 1 ? 's' : ''} a look` : 'IDs, insurance, certifications, the facts you need fast'} back="#/more" icon="layers" color="var(--peach)"
+      <PageHead hub={hub} title="Documents" sub={attention ? `${attention} need${attention === 1 ? 's' : ''} a look` : 'IDs, insurance, certifications, the facts you need fast'} back="#/more" icon="layers" color="var(--peach)"
         action={<button class="btn primary sm" onClick={() => setEdit(blank())}><Icon name="plus" size={16} />Add</button>} />
       {rows === null ? <div class="skeleton" /> : !rows.length ? (
         <div class="card soft"><p class="muted">Add the things you’d hate to dig for: insurance, car registration, tax returns, W-2s, your lease. Say where each original lives, and add the expiry date if it has one.</p></div>
@@ -179,10 +179,10 @@ export function Records() {
 }
 
 /** Your things: the car, the apartment and anything else you own, plus inventories. */
-export function Things() {
+export function Things({ hub }: { hub?: Hub }) {
   return (
     <>
-      <PageHead title="Your things" sub="Car, apartment and what you own" back="#/more" icon="car" color="var(--sky)" />
+      <PageHead hub={hub} title="Your things" sub="Car, apartment and what you own" back="#/more" icon="car" color="var(--sky)" />
       <AssetsStrip />
       <div style="height:14px" />
       <Inventories />

@@ -6,7 +6,7 @@ import { dailySeries, consistency, fmtValue } from '../lib/metrics'
 import { eventsOn } from '../lib/cal'
 import type { Review, Task } from '../lib/types'
 import { Icon } from '../ui/icons'
-import { PageHead, Card, ScalePicker, ListInputs, burst } from '../ui/kit'
+import { PageHead, Card, ScalePicker, ListInputs, burst, HubTabs, type Hub } from '../ui/kit'
 import { Flow, type Step } from '../ui/flow'
 import { TaskRow, TaskSheet, openTask } from './Tasks'
 import { goalProgress } from './Goals'
@@ -30,14 +30,14 @@ export function ReviewSummary({ r, onEdit }: { r: Review; onEdit?: () => void })
       {r.focus?.length > 0 && <Card title="Focus for the next week" icon="compass" accent="var(--lilac)">{r.focus.map((x, i) => <div class="row" style="padding:5px 0"><span class="pill quiet">{i + 1}</span>{x}</div>)}</Card>}
       {r.wins && <Card title="What went well" icon="sparkle" accent="var(--gold)"><p style="white-space:pre-wrap">{r.wins}</p></Card>}
       {r.lessons && <Card title="What you’ll change" icon="bolt" accent="var(--coral)"><p style="white-space:pre-wrap">{r.lessons}</p></Card>}
-      {onEdit && <div class="row" style="margin:4px 0 16px"><button class="btn grow" onClick={onEdit}><Icon name="edit" size={17} />Edit this review</button><a class="btn grow" href="#/insights">All reviews in Insights</a></div>}
+      {onEdit && <div class="row" style="margin:4px 0 16px"><button class="btn grow" onClick={onEdit}><Icon name="edit" size={17} />Edit this review</button><a class="btn grow" href="#/review/patterns">All reviews</a></div>}
     </>
   )
 }
 
 const avg = (xs: (number | null)[]) => { const v = xs.filter((x): x is number => x != null); return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null }
 
-export function WeeklyReview() {
+export function WeeklyReview({ hub }: { hub?: Hub }) {
   const reviews = useStore((s) => s.reviews)
   const [ws] = useState(() => targetWeek())
   const existing = reviews.find((r) => r.week_start === ws)
@@ -86,7 +86,7 @@ export function WeeklyReview() {
 
   if (existing && !editing) return (
     <>
-      <PageHead title="Weekly review" sub={`${fmtShort(ws)} to ${fmtShort(end)} · done`} icon="review" color="var(--lilac)" />
+      <PageHead hub={hub} title="Weekly review" sub={`${fmtShort(ws)} to ${fmtShort(end)} · done`} icon="review" color="var(--lilac)" />
       <ReviewSummary r={existing} onEdit={() => { setF({ wins: existing.wins ?? '', lessons: existing.lessons ?? '', focus: existing.focus ?? [], rating: existing.rating ?? null }); setEditing(true) }} />
     </>
   )
@@ -137,6 +137,7 @@ export function WeeklyReview() {
 
   return (
     <>
+      {hub && <HubTabs hub={hub} />}
       <Flow title="Weekly review" color="var(--lilac)" steps={steps} finishLabel={existing ? 'Update review' : 'Finish review'}
         onExit={() => { if (existing) setEditing(false); else location.hash = '#/today' }} onFinish={(b) => save(b)} />
       <TaskSheet task={edit} onClose={() => setEdit(null)} />

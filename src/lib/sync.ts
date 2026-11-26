@@ -31,13 +31,17 @@ export async function checkAppUpdate(): Promise<'new' | 'latest' | 'none'> {
 }
 
 /** When each outside source last brought something in. */
-export async function sourceTimes() {
-  if (getState().demo) return { monarch: new Date(Date.now() - 2 * 3600e3).toISOString(), ringDay: today() }
-  const [a, r] = await Promise.all([
+export type Times = { monarch: string | null; ringDay: string | null; ringAt: string | null; canvas: string | null }
+export async function sourceTimes(): Promise<Times> {
+  if (getState().demo) return { monarch: new Date(Date.now() - 2 * 3600e3).toISOString(), ringDay: today(), ringAt: new Date(Date.now() - 5 * 3600e3).toISOString(), canvas: new Date(Date.now() - 40 * 60e3).toISOString() }
+  const [a, r, f, c] = await Promise.all([
     supabase.from('fin_accounts').select('as_of').order('as_of', { ascending: false }).limit(1),
     supabase.from('ring_days').select('day').not('vals->sleep_hours', 'is', null).order('day', { ascending: false }).limit(1),
+    supabase.from('ring_days').select('fetched_at').order('fetched_at', { ascending: false, nullsFirst: false }).limit(1),
+    supabase.from('calendar_events').select('synced_at').eq('calendar_name', 'Canvas').order('synced_at', { ascending: false, nullsFirst: false }).limit(1),
   ])
-  return { monarch: (a.data?.[0] as { as_of?: string } | undefined)?.as_of ?? null, ringDay: (r.data?.[0] as { day?: string } | undefined)?.day ?? null }
+  const one = <T,>(x: { data: unknown }, k: string) => ((x.data as Record<string, T>[] | null)?.[0]?.[k] ?? null) as T | null
+  return { monarch: one<string>(a, 'as_of'), ringDay: one<string>(r, 'day'), ringAt: one<string>(f, 'fetched_at'), canvas: one<string>(c, 'synced_at') }
 }
 
 /** Ask the ring-sync function for the newest nights. Returns a short line for people. */
@@ -79,9 +83,9 @@ export function syncAll(quiet = false) {
     }),
   ]).then(() => {
     if (quiet) return
-    // Claude copies the calendar in every 2 hours, so this shows when it last landed.
+    // Claude copies the calendar in every 6 hours, so this shows when it last landed.
     const s = getState().synced_at
-    put('calendar', !s ? 'off' : Date.now() - new Date(s).getTime() < 6 * 3600e3 ? 'ok' : 'warn', s ? `Copied ${relTime(s)}` : 'Not copied yet')
+    put('calendar', !s ? 'off' : Date.now() - new Date(s).getTime() < 8 * 3600e3 ? 'ok' : 'warn', s ? `Copied ${relTime(s)}. Claude copies it every 6 hours.` : 'Not copied yet')
     hideTimer = window.setTimeout(() => setState({ sync: null }), 7000)
   }).catch(() => { if (!quiet) toast('Couldn’t sync. Check your connection.') })
     .finally(() => { running = null })

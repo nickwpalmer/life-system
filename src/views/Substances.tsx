@@ -3,7 +3,7 @@ import { useRows, addRow, dropRow, patchRow, registerDemo } from '../lib/rows'
 import { toast, setState, useStore } from '../lib/store'
 import { dayKey, today, addDays, fmtDay, fmtTime, weekStart, lastNDays, fromKey } from '../lib/dates'
 import { Icon } from '../ui/icons'
-import { Sheet, PageHead, Card, haptic } from '../ui/kit'
+import { Sheet, PageHead, Card, haptic, type Hub } from '../ui/kit'
 import { BarChart } from '../ui/charts'
 
 /**
@@ -173,7 +173,7 @@ function Detail({ name, rows, color }: { name: string; rows: Sub[]; color: strin
   )
 }
 
-export function Substances() {
+export function Substances({ hub }: { hub?: Hub }) {
   const rows = useRows<Sub>('substance_logs')
   const names = useNames(rows)
   const used = names.filter((n) => rows?.some((r) => subKey(r.substance) === subKey(n)))
@@ -194,7 +194,7 @@ export function Substances() {
   for (const r of list.slice(0, 200)) { const d = dayKey(new Date(r.occurred_at)); groups.set(d, [...(groups.get(d) ?? []), r]) }
   return (
     <>
-      <PageHead title="Substances" sub="Everything non-food, in order" icon="flask" color="var(--orange)" back="#/area/health"
+      <PageHead hub={hub} title="Substances" sub="Everything non-food, in order" icon="flask" color="var(--orange)"
         action={<button class="btn primary sm" onClick={() => setOpen(true)}><Icon name="plus" size={16} />Log</button>} />
       {rows === null ? <div class="skeleton" /> : !rows.length ? (
         <div class="card soft"><p class="muted">Nothing logged yet. Tap Log, or the + button. Coffee, a drink, a supplement or a med all go here.</p></div>

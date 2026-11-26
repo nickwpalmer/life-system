@@ -8,12 +8,12 @@ import { ROLE_LABEL } from '../lib/metrics'
 import type { Area, Metric, MetricKind, MetricRole } from '../lib/types'
 import { Icon } from '../ui/icons'
 import { Sheet, Switch, PageHead } from '../ui/kit'
-import { syncAll, syncRing, sourceTimes } from '../lib/sync'
+import { syncAll } from '../lib/sync'
+import { SyncStatus } from './SyncStatus'
 import { usePrefs, savePrefs, LOGOS, logoUrl } from '../lib/prefs'
 import { haptic, hapticsOn, setHaptics } from '../lib/haptics'
-import { relTime, fmtShort, daysBetween, today } from '../lib/dates'
 
-export const VERSION = 'v0.6'
+export const VERSION = 'v0.7'
 import { NAV } from '../app'
 
 type Passkey = { id: string; friendly_name?: string; created_at: string; last_used_at?: string }
@@ -209,23 +209,14 @@ function Conn({ name, icon, sub, state, children }: { name: string; icon: string
 }
 
 function Connections() {
-  const synced = useStore((s) => s.synced_at)
-  const demo = useStore((s) => s.demo)
   const email = useStore((s) => s.session?.user.email)
-  const [st, setSt] = useState<{ monarch: string | null; ringDay: string | null } | null>(null)
   const [pw, setPw] = useState('')
   const [pwOpen, setPwOpen] = useState(false)
-  const [ringBusy, setRingBusy] = useState(false)
-  const load = () => sourceTimes().then(setSt).catch(() => {})
-  useEffect(() => { load() }, [demo])
-  const fresh = (iso: string | null | undefined, h: number) => !!iso && Date.now() - new Date(iso).getTime() < h * 3600e3
   async function changePw() {
     if (pw.length < 10) { toast('Use at least 10 characters'); return }
     const { error } = await supabase.auth.updateUser({ password: pw })
     toast(error ? error.message : 'Password changed'); if (!error) { setPw(''); setPwOpen(false) }
   }
-  async function ring() { setRingBusy(true); const [, line] = await syncRing().catch(() => ['fail', 'Couldn’t reach the ring sync'] as const); setRingBusy(false); toast(line); load() }
-  const behind = st?.ringDay ? daysBetween(st.ringDay, today()) : null
   return (
     <section class="card">
       <div class="card-h"><h2>Connections</h2></div>
@@ -240,15 +231,6 @@ function Connections() {
           <p class="faint tiny" style="margin-top:10px">Updates install themselves the next time you open the app. Built {new Date(__BUILD__).toLocaleString([], { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}.</p>
         </div>
         <Security />
-      </Conn>
-      <Conn name="Google Calendar" icon="cal" state={synced ? (fresh(synced, 6) ? 'ok' : 'warn') : 'off'} sub={synced ? `Copied ${relTime(synced)}, every 2 hours` : 'Not copied yet'} />
-      <Conn name="Monarch" icon="money" state={st?.monarch ? (fresh(st.monarch, 24 * 8) ? 'ok' : 'warn') : 'off'} sub={st?.monarch ? `Balances from ${relTime(st.monarch)}. Claude copies them in.` : 'No balances yet'} />
-      <Conn name="Ultrahuman ring" icon="pulse" state={behind == null ? 'off' : behind <= 1 ? 'ok' : 'warn'}
-        sub={st?.ringDay ? `Newest night ${fmtShort(st.ringDay)}. Pulled morning and evening.` : 'No nights yet'}>
-        <div class="conn-body row wrap" style="gap:8px">
-          <button class={`btn ghost sm ${ringBusy ? 'busy' : ''}`} disabled={ringBusy} onClick={ring}><Icon name="history" size={16} />{ringBusy ? 'Syncing…' : 'Sync the ring'}</button>
-          <a class="btn ghost sm" href="#/help/ring">If it stops syncing</a>
-        </div>
       </Conn>
       <Conn name="Claude" icon="sparkle" state="ok" sub="Reads and writes your data, logs every change">
         <div class="conn-body"><a class="btn ghost sm" href="#/changes">See and undo Claude’s changes</a></div>
@@ -286,6 +268,7 @@ export function Settings() {
         ))}
       </section>
 
+      <SyncStatus />
       <Connections />
 
       <a class="card prompt" href="#/help" style="--accent:var(--sky)"><span class="orb"><Icon name="help" size={20} /></span><span class="grow"><h3>Help</h3><p class="muted small">The ring, updates, undoing a check-in</p></span><Icon name="chev" /></a>

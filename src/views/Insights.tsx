@@ -4,7 +4,7 @@ import { lastNDays } from '../lib/dates'
 import { dailySeries, consistency, streak } from '../lib/metrics'
 import type { Metric } from '../lib/types'
 import { Icon } from '../ui/icons'
-import { PageHead, Card } from '../ui/kit'
+import { PageHead, Card, type Hub } from '../ui/kit'
 import { LineChart, BarChart } from '../ui/charts'
 import { fmtShort } from '../lib/dates'
 import type { Review } from '../lib/types'
@@ -25,7 +25,7 @@ function pearson(a: (number | null)[], b: (number | null)[]) {
 
 type Finding = { icon: string; c: string; text: string }
 
-export function Insights() {
+export function Insights({ hub }: { hub?: Hub }) {
   const metrics = useStore((s) => s.metrics.filter((m) => m.active))
   const logs = useStore((s) => s.logs)
   const checkins = useStore((s) => s.checkins)
@@ -65,7 +65,7 @@ export function Insights() {
 
   return (
     <>
-      <PageHead title="Insights" icon="chart" color="var(--teal)" action={<div class="chips">{[7, 30, 90].map((n) => <button class={`chip ${range === n ? 'on' : ''}`} style="height:30px" onClick={() => setRange(n)}>{n}d</button>)}</div>} />
+      <PageHead hub={hub} sub={hub ? 'What goes with what, and how the weeks add up' : undefined} title="Insights" icon="chart" color="var(--teal)" action={<div class="chips">{[7, 30, 90].map((n) => <button class={`chip ${range === n ? 'on' : ''}`} style="height:30px" onClick={() => setRange(n)}>{n}d</button>)}</div>} />
       <div class="stat-row four">
         <div class="stat" style="--c:var(--pink)"><div class="s-val">{avg(mood)?.toFixed(1) ?? '–'}</div><div class="s-lbl">avg mood</div></div>
         <div class="stat" style="--c:var(--sky)"><div class="s-val">{avg(sleep)?.toFixed(1) ?? '–'}</div><div class="s-lbl">avg sleep (h)</div></div>
